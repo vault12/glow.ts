@@ -23,6 +23,7 @@
   "homepage": "https://github.com/vault12/glow.ts#readme",
   "license": "MIT",
   "scripts": {
+    "build": "tsc",
     "lint": "eslint 'src/**'",
     "lint:fix": "eslint 'src/**' --fix"
   },
