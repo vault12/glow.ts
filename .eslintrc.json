@@ -27,7 +27,7 @@
     ],
     "max-len": [
       "warn",
-      140
+      120
     ],
     "quotes": [
       "error",
