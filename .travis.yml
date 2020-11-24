@@ -3,7 +3,3 @@ node_js: 14.15.1
 cache: npm
 notifications:
   email: false
-env:
-  - CI=true
-# script:
-#  - npm run test
