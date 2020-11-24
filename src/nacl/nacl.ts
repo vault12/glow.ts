@@ -26,7 +26,7 @@ export class Nacl {
   crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Uint8Array {
     return box(message, nonce, pk, sk);
   }
-  crypto_box_open(ciphertext: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Uint8Array {
+  crypto_box_open(ciphertext: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Uint8Array | null {
     return box.open(ciphertext, nonce, pk, sk);
   }
 
