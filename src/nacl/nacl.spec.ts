@@ -18,6 +18,6 @@ describe('Nacl', () => {
     const key = nacl.random_bytes(nacl.crypto_secretbox_KEYBYTES);
     const encrypted = nacl.crypto_secretbox(input, nonce, key);
     const decrypted = nacl.crypto_secretbox_open(encrypted, nonce, key);
-    expect(decrypted).toEqual(new Uint8Array([1,2,3]));
+    expect(decrypted).toEqual(input);
   });
 });

@@ -1,8 +1,3 @@
-/* jest.mock('../environment.ts', () => ({
-  IS_DEV: true,
-  IS_PROD: false,
-})); */
-
 import { Keys } from './keys';
 
 describe('Keys', () => {
