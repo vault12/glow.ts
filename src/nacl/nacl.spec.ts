@@ -13,11 +13,24 @@ describe('Nacl', () => {
   });
 
   it('crypto_secretbox', () => {
-    const input = new Uint8Array([1,2,3]);
+    const input = nacl.random_bytes(1000);
     const nonce = nacl.crypto_secretbox_random_nonce();
     const key = nacl.random_bytes(nacl.crypto_secretbox_KEYBYTES);
     const encrypted = nacl.crypto_secretbox(input, nonce, key);
     const decrypted = nacl.crypto_secretbox_open(encrypted, nonce, key);
     expect(decrypted).toEqual(input);
+  });
+
+  it('crypto_hash_sha512', () => {
+    expect(nacl.to_hex(nacl.crypto_hash_sha512(nacl.encode_utf8('hello'))))
+      .toBe('9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673' +
+      'ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043');
+  });
+
+  it('hex', () => {
+    expect(nacl.to_hex(nacl.encode_utf8('hello'))).toBe('68656c6c6f');
+
+    expect(nacl.decode_utf8(nacl.from_hex('68656c6c6f'))).toBe('hello');
+    expect(nacl.decode_utf8(nacl.from_hex('68656C6C6F'))).toBe('hello');
   });
 });
