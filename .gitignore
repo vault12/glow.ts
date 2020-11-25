@@ -1,0 +1,10 @@
+*.log
+*.tmp
+*.tmp.*
+.idea
+.DS_Store
+.cache
+node_modules
+
+dist
+coverage
