@@ -1,4 +1,5 @@
-import { randomBytes, secretbox, box, BoxKeyPair, hash } from 'tweetnacl';
+import { randomBytes, secretbox, box, BoxKeyPair } from 'tweetnacl';
+import { sha256 } from 'js-sha256';
 
 interface CryptoBoxKeypair {
   boxPk: Uint8Array
@@ -54,13 +55,13 @@ export class Nacl {
   }
 
   crypto_box_keypair_from_seed(seed: Uint8Array): CryptoBoxKeypair {
-    return this.crypto_box_keypair_from_raw_sk(this.crypto_hash_sha512(seed).subarray(0, box.secretKeyLength));
+    return this.crypto_box_keypair_from_raw_sk(this.crypto_hash_sha256(seed).subarray(0, box.secretKeyLength));
   }
 
   // Hashing
 
-  crypto_hash_sha512(data: Uint8Array): Uint8Array {
-    return hash(data);
+  crypto_hash_sha256(data: Uint8Array): Uint8Array {
+    return this.from_hex(sha256(data));
   }
 
   // Randomness
