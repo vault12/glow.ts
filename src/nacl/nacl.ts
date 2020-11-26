@@ -1,12 +1,9 @@
-import { randomBytes, secretbox, box, BoxKeyPair } from 'tweetnacl';
+import { box, BoxKeyPair, randomBytes, secretbox } from 'tweetnacl';
 import { sha256 } from 'js-sha256';
 
-interface CryptoBoxKeypair {
-  boxPk: Uint8Array
-  boxSk: Uint8Array
-}
+import { CryptoBoxKeypair, NaClDriver } from './nacl-driver.interface';
 
-export class Nacl {
+export class Nacl implements NaClDriver {
 
   // Secret-key authenticated encryption (secretbox)
 
