@@ -1,19 +1,37 @@
+import { Base64, Utils } from '../utils/utils';
+import { CryptoBoxKeypair } from '../nacl/nacl-driver.interface';
+
 export class Keys {
-  hashKeys: string;
+  private keyPair: CryptoBoxKeypair;
 
-  constructor(public keys: string) {
-    this.hashKeys = keys;
+  constructor(public keys: Base64 | CryptoBoxKeypair) {
+    if (typeof keys === 'string') {
+      const { boxPk, boxSk } = JSON.parse(keys);
+      this.keyPair = {
+        boxPk: Utils.encode_latin1(Utils.fromBase64(boxPk)),
+        boxSk: Utils.encode_latin1(Utils.fromBase64(boxSk))
+      };
+    } else {
+      this.keyPair = keys;
+    }
   }
 
-  toBase64(): string {
-    const isBrowser = typeof btoa !== 'undefined';
-    return isBrowser ? btoa(this.hashKeys) : Buffer.from(this.hashKeys, 'utf-8').toString('base64');
+  toString(): string {
+    return JSON.stringify({
+      boxPk: this.publicKey,
+      boxSk: this.privateKey
+    });
   }
 
-  fromBase64(input: string): string {
-    const isBrowser = typeof btoa !== 'undefined';
-    this.hashKeys = isBrowser ? atob(input) : Buffer.from(input, 'base64').toString('utf-8');
-    console.log(`decrypting ${input}...`);
-    return this.hashKeys;
+  static isEqual(keys1: Keys, keys2: Keys): boolean {
+    return keys1.toString() === keys2.toString();
+  }
+
+  get publicKey(): Base64 {
+    return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxPk));
+  }
+
+  get privateKey(): Base64 {
+    return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxSk));
   }
 }
