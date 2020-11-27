@@ -1,5 +1,5 @@
 export interface StorageDriver {
-  get(key: string): Promise<unknown>;
-  set(key: string, value: unknown): Promise<void>;
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string | null): Promise<void>;
   remove(key: string): Promise<void>;
 }
