@@ -1,4 +1,6 @@
 export const config = {
+
+  NONCE_TAG:  '__nc',
   // Relay tokens, keys and hashes are 32 bytes
   RELAY_TOKEN_LEN: 32,
 
