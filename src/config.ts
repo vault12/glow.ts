@@ -1,6 +1,7 @@
 export const config = {
 
-  NONCE_TAG:  '__nc',
+  NONCE_TAG: '__nc',
+  STORAGE_ROOT: '.v2.stor.vlt12',
   // Relay tokens, keys and hashes are 32 bytes
   RELAY_TOKEN_LEN: 32,
 
