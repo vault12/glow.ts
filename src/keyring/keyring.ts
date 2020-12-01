@@ -3,6 +3,7 @@ import { LocalStorageDriver } from '../crypto-storage/local-storage.driver';
 import { Keys } from '../keys/keys';
 import { Nacl } from '../nacl/nacl';
 import { Utils, Base64 } from '../utils/utils';
+import { config } from '../config';
 
 interface KeyRecord {
   pk: Base64;
@@ -18,10 +19,15 @@ export class KeyRing {
   public guestKeys?: any; // TODO: define type
   public guestKeyTimeouts?: any; // TODO: define type
 
-  constructor() {
+  private constructor() {
     this.storage = new CryptoStorage(new LocalStorageDriver());
-    this.loadCommKey();
-    this.loadGuestKeys();
+  }
+
+  static async new(): Promise<KeyRing> {
+    const keyRing = new KeyRing();
+    await keyRing.loadCommKey();
+    await keyRing.loadGuestKeys();
+    return keyRing;
   }
 
   getNumberOfGuests(): number {
@@ -44,6 +50,41 @@ export class KeyRing {
       this.hpk = nacl.h2(this.commKey.publicKey);
       await this.storage.save('comm_key', this.commKey);
     }
+  }
+
+  // Backups
+
+  async backup(): Promise<string> {
+    const backupObject: any = {};
+    backupObject[config.COMM_KEY_TAG] = this.commKey?.privateKey;
+
+    if (this.getNumberOfGuests() > 0) {
+      for (const [key, value] of Object.entries(this.guestKeys)) {
+        if (key && value) {
+          backupObject[key] = (value as KeyRecord).pk;
+        }
+      }
+    }
+    return JSON.stringify(backupObject);
+  }
+
+  static async fromBackup(id: string, backup: string): Promise<KeyRing> {
+    const backupObject = JSON.parse(backup);
+    const strCommKey = Utils.encode_latin1(Utils.fromBase64(backupObject[config.COMM_KEY_TAG]));
+    delete backupObject[config.COMM_KEY_TAG];
+    const restoredKeyRing = await KeyRing.new();
+    restoredKeyRing.commFromSecKey(strCommKey);
+    for (const [key, value] of Object.entries(backupObject)) {
+      await restoredKeyRing.addGuest(key, value as string);
+    }
+    return restoredKeyRing;
+  }
+
+  async commFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
+    const nacl = new Nacl();
+    this.commKey = new Keys(nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
+    this.hpk = nacl.h2(this.commKey.publicKey);
+    await this.storage.save('comm_key', this.commKey);
   }
 
   private async loadGuestKeys() {

@@ -2,14 +2,14 @@ import { KeyRing } from './keyring';
 import { Nacl } from '../nacl/nacl';
 import { Keys } from '../keys/keys';
 
-describe.only('Keyring', () => {
+describe('Keyring', () => {
   let ring1: KeyRing;
   let ring2: KeyRing;
   let nacl: Nacl;
 
-  beforeEach(() => {
-    ring1 = new KeyRing();
-    ring2 = new KeyRing();
+  beforeEach(async () => {
+    ring1 = await KeyRing.new();
+    ring2 = await KeyRing.new();
     nacl = new Nacl();
   });
 
@@ -24,5 +24,24 @@ describe.only('Keyring', () => {
     await ring1.addGuest('Bob', keys2.publicKey);
     expect(ring1.getNumberOfGuests()).toBe(2);
     expect(ring1.guestKeys['Bob']).not.toBeNull();
+  });
+
+  it('backup and restore', async () => {
+    const originalRing = await KeyRing.new();
+    for (let i = 0; i < 10; i++) {
+      const keys = new Keys(nacl.crypto_box_keypair());
+      await originalRing.addGuest(`keys${i}`, keys.publicKey);
+    }
+
+    const backup = await originalRing.backup();
+
+    const restored = await KeyRing.fromBackup('id', backup);
+    const backedUpAgain = await restored.backup();
+
+    expect(originalRing.commKey).toEqual(restored.commKey);
+    expect(originalRing.guestKeys).toEqual(restored.guestKeys);
+    expect(originalRing.hpk).toEqual(restored.hpk);
+
+    expect(backup).toBe(backedUpAgain);
   });
 });
