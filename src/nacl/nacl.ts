@@ -112,4 +112,16 @@ export class Nacl implements NaClDriver {
     }
     return result;
   }
+
+
+  // h2(m) = sha256(sha256(64x0 + m))
+  // Zero out initial sha256 block, and double hash 0-padded message
+  // http://cs.nyu.edu/~dodis/ps/h-of-h.pdf
+  h2(data: string): Uint8Array {
+    const source = this.encode_latin1(data);
+    const extendedSource = new Uint8Array(64 + source.length);
+    extendedSource.fill(0);
+    extendedSource.set(source, 64);
+    return this.crypto_hash_sha256(this.crypto_hash_sha256(extendedSource));
+  }
 }

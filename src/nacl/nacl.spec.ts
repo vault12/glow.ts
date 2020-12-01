@@ -32,4 +32,9 @@ describe('Nacl', () => {
     expect(nacl.decode_utf8(nacl.from_hex('68656c6c6f'))).toBe('hello');
     expect(nacl.decode_utf8(nacl.from_hex('68656C6C6F'))).toBe('hello');
   });
+
+  it('hash₂ of utf8 strings', () => {
+    const h2 = nacl.h2('Heizölrückstoßabdämpfung');
+    expect(nacl.to_hex(h2)).toBe('6f1d7a58b6ea177040f9bf6056913ddacef2bacff0c84b8c07d9dc01e27e147f');
+  });
 });
