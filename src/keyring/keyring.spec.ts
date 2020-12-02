@@ -1,6 +1,7 @@
 import { KeyRing } from './keyring';
 import { Nacl } from '../nacl/nacl';
 import { Keys } from '../keys/keys';
+import { config } from '../config';
 
 describe('Keyring', () => {
   let ring1: KeyRing;
@@ -43,5 +44,22 @@ describe('Keyring', () => {
     expect(originalRing.hpk).toEqual(restored.hpk);
 
     expect(backup).toBe(backedUpAgain);
+  });
+
+  it('temporary keys', async () => {
+    jest.useFakeTimers();
+    // mock config value
+    config.RELAY_SESSION_TIMEOUT = 5;
+    const ring = await KeyRing.new();
+    const keys = new Keys(nacl.crypto_box_keypair());
+    await ring.addTempGuest('temp', keys.publicKey);
+    // the key has to exist before we run the timer
+    expect(ring.getGuestKey('temp')).not.toBeNull();
+    jest.runAllTimers();
+
+    expect(setTimeout).toHaveBeenCalledTimes(1);
+    expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), 5);
+    // the key is erased
+    expect(ring.getNumberOfGuests()).toBe(0);
   });
 });

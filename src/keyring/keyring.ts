@@ -11,6 +11,11 @@ interface KeyRecord {
   temp: boolean;
 }
 
+interface TempKeyTimeout {
+  timeoutId: number;
+  startTime: number;
+}
+
 interface KeyRingBackup {
   [key: string]: string | null | undefined
 }
@@ -21,11 +26,12 @@ export class KeyRing {
   public commKey?: Keys;
   public hpk?: Uint8Array;
   public guestKeys: Map<string, KeyRecord>;
-  public guestKeyTimeouts?: any; // TODO: define type
+  public guestKeyTimeouts: Map<string, TempKeyTimeout>;
 
   private constructor() {
     this.storage = new CryptoStorage(new LocalStorageDriver());
     this.guestKeys = new Map();
+    this.guestKeyTimeouts = new Map();
   }
 
   static async new(): Promise<KeyRing> {
@@ -123,13 +129,14 @@ export class KeyRing {
     if (Array.isArray(guestKeys)) {
       this.guestKeys = new Map(guestKeys);
     }
-    this.guestKeyTimeouts = {};
   }
 
   async addGuest(guestTag: string, b64_pk: string): Promise<string> {
-    const b64_h2 = await this.addGuestRecord(guestTag, b64_pk);
-    await this.saveGuests();
-    return b64_h2;
+    return await this.processGuest(guestTag, b64_pk);
+  }
+
+  async addTempGuest(guestTag: string, b64_pk: string): Promise<string> {
+    return await this.processGuest(guestTag, b64_pk, true);
   }
 
   async removeGuest(guestTag: string): Promise<boolean> {
@@ -140,23 +147,40 @@ export class KeyRing {
     return true;
   }
 
-  private async addGuestRecord(guestTag: string, b64_pk: string): Promise<string> {
+  private async processGuest(guestTag: string, b64_pk: string, isTemporary?: boolean): Promise<string> {
     const nacl = new Nacl();
     const b64_h2 = Utils.toBase64(Utils.decode_latin1(nacl.h2(b64_pk)));
     this.guestKeys.set(guestTag, {
       pk: b64_pk,
       hpk: b64_h2,
-      temp: false
+      temp: !!isTemporary
     });
+    if (isTemporary) {
+      this.setKeyTimeout(guestTag);
+      await this.saveGuests();
+    }
     return b64_h2;
+  }
+
+  private setKeyTimeout(guestTag: string) {
+    const existingTimeout = this.guestKeyTimeouts.get(guestTag);
+    if (existingTimeout) {
+      window.clearTimeout(existingTimeout.timeoutId);
+    }
+
+    const newTimeoutId = window.setTimeout(() => {
+      this.guestKeys.delete(guestTag);
+      this.guestKeyTimeouts.delete(guestTag);
+    }, config.RELAY_SESSION_TIMEOUT);
+
+    this.guestKeyTimeouts.set(guestTag, {
+      timeoutId: newTimeoutId,
+      startTime: Date.now()
+    });
   }
 
   private async saveGuests() {
     await this.storage.save('guest_registry', Array.from(this.guestKeys.entries()));
-  }
-
-  private async saveKey(tag: string, key: Keys) {
-    await this.storage.save(tag, key.toString());
   }
 
   private async getKey(tag: string) {
@@ -166,9 +190,5 @@ export class KeyRing {
     } else {
       return null;
     }
-  }
-
-  private async deleteKey(tag: string) {
-    await this.storage.remove(tag);
   }
 }
