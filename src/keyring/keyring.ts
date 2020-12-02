@@ -11,16 +11,21 @@ interface KeyRecord {
   temp: boolean;
 }
 
+interface KeyRingBackup {
+  [key: string]: string | undefined
+}
+
 // Manages the set of public keys of counterparties
 export class KeyRing {
   public storage: CryptoStorage;
   public commKey?: Keys;
   public hpk?: Uint8Array;
-  public guestKeys?: any; // TODO: define type
+  public guestKeys: Map<string, KeyRecord>;
   public guestKeyTimeouts?: any; // TODO: define type
 
   private constructor() {
     this.storage = new CryptoStorage(new LocalStorageDriver());
+    this.guestKeys = new Map();
   }
 
   static async new(): Promise<KeyRing> {
@@ -31,7 +36,7 @@ export class KeyRing {
   }
 
   getNumberOfGuests(): number {
-    return Object.keys(this.guestKeys || {}).length;
+    return this.guestKeys.size;
   }
 
   getPubCommKey(): string | undefined {
@@ -55,13 +60,13 @@ export class KeyRing {
   // Backups
 
   async backup(): Promise<string> {
-    const backupObject: any = {};
+    const backupObject: KeyRingBackup = {};
     backupObject[config.COMM_KEY_TAG] = this.commKey?.privateKey;
 
     if (this.getNumberOfGuests() > 0) {
-      for (const [key, value] of Object.entries(this.guestKeys)) {
+      for (const [key, value] of this.guestKeys) {
         if (key && value) {
-          backupObject[key] = (value as KeyRecord).pk;
+          backupObject[key] = value.pk;
         }
       }
     }
@@ -96,10 +101,8 @@ export class KeyRing {
 
   private async loadGuestKeys() {
     const guestKeys = await this.storage.get('guest_registry');
-    if (guestKeys) {
-      this.guestKeys = guestKeys; // tag -> { pk, hpk }
-    } else {
-      this.guestKeys = {};
+    if (Array.isArray(guestKeys)) {
+      this.guestKeys = new Map(guestKeys);
     }
     this.guestKeyTimeouts = {};
   }
@@ -111,8 +114,8 @@ export class KeyRing {
   }
 
   async removeGuest(guestTag: string): Promise<boolean> {
-    if (this.guestKeys[guestTag]) {
-      delete this.guestKeys[guestTag];
+    if (this.guestKeys.has(guestTag)) {
+      this.guestKeys.delete(guestTag);
       await this.saveGuests();
     }
     return true;
@@ -121,16 +124,16 @@ export class KeyRing {
   private async addGuestRecord(guestTag: string, b64_pk: string): Promise<string> {
     const nacl = new Nacl();
     const b64_h2 = Utils.toBase64(Utils.decode_latin1(nacl.h2(b64_pk)));
-    this.guestKeys[guestTag] = {
+    this.guestKeys.set(guestTag, {
       pk: b64_pk,
       hpk: b64_h2,
       temp: false
-    } as KeyRecord;
+    });
     return b64_h2;
   }
 
   private async saveGuests() {
-    await this.storage.save('guest_registry', this.guestKeys);
+    await this.storage.save('guest_registry', Array.from(this.guestKeys.entries()));
   }
 
   private async saveKey(tag: string, key: Keys) {

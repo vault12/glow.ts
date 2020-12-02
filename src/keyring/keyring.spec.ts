@@ -19,11 +19,11 @@ describe('Keyring', () => {
 
     await ring1.addGuest('Alice', keys1.publicKey);
     expect(ring1.getNumberOfGuests()).toBe(1);
-    expect(ring1.guestKeys['Alice']).not.toBeNull();
+    expect(ring1.guestKeys.get('Alice')).not.toBeNull();
 
     await ring1.addGuest('Bob', keys2.publicKey);
     expect(ring1.getNumberOfGuests()).toBe(2);
-    expect(ring1.guestKeys['Bob']).not.toBeNull();
+    expect(ring1.guestKeys.get('Bob')).not.toBeNull();
   });
 
   it('backup and restore', async () => {
