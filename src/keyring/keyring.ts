@@ -80,6 +80,13 @@ export class KeyRing {
     return restoredKeyRing;
   }
 
+  async commFromSeed(seed: Uint8Array): Promise<void> {
+    const nacl = new Nacl();
+    this.commKey = new Keys(nacl.crypto_box_keypair_from_seed(seed));
+    this.hpk = nacl.h2(this.commKey.publicKey);
+    await this.storage.save('comm_key', this.commKey);
+  }
+
   async commFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
     const nacl = new Nacl();
     this.commKey = new Keys(nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
