@@ -1,7 +1,8 @@
 import { box, BoxKeyPair, randomBytes, secretbox } from 'tweetnacl';
 import { sha256 } from 'js-sha256';
 
-import { CryptoBoxKeypair, NaClDriver } from './nacl-driver.interface';
+import { NaClDriver } from './nacl-driver.interface';
+import { CryptoBoxKeypair } from './crypto-box-keypair.interface';
 
 export class Nacl implements NaClDriver {
 

@@ -1,5 +1,5 @@
 import { Base64, Utils } from '../utils/utils';
-import { CryptoBoxKeypair } from '../nacl/nacl-driver.interface';
+import { CryptoBoxKeypair } from '../nacl/crypto-box-keypair.interface';
 
 export class Keys {
   private keyPair: CryptoBoxKeypair;
@@ -31,7 +31,10 @@ export class Keys {
     return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxPk));
   }
 
-  get privateKey(): Base64 {
-    return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxSk));
+  get privateKey(): Base64 | null {
+    if (this.keyPair.boxSk) {
+      return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxSk));
+    }
+    return null;
   }
 }

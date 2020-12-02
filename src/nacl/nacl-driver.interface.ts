@@ -1,7 +1,4 @@
-export interface CryptoBoxKeypair {
-  boxPk: Uint8Array
-  boxSk: Uint8Array
-}
+import { CryptoBoxKeypair } from './crypto-box-keypair.interface';
 
 export interface NaClDriver {
   crypto_secretbox_KEYBYTES: number;

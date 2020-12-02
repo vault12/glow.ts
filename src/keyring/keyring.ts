@@ -12,7 +12,7 @@ interface KeyRecord {
 }
 
 interface KeyRingBackup {
-  [key: string]: string | undefined
+  [key: string]: string | null | undefined
 }
 
 // Manages the set of public keys of counterparties
@@ -41,6 +41,25 @@ export class KeyRing {
 
   getPubCommKey(): string | undefined {
     return this.commKey?.publicKey;
+  }
+
+  getTagByHpk(hpk: string): string | null {
+    for (const [key, value] of this.guestKeys) {
+      if (value.hpk === hpk) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  getGuestKey(guestTag: string): Keys | null {
+    const keyRecord = this.guestKeys.get(guestTag);
+    if (keyRecord) {
+      return new Keys({
+        boxPk: Utils.encode_latin1(Utils.fromBase64(keyRecord.pk))
+      });
+    }
+    return null;
   }
 
   private async loadCommKey() {
