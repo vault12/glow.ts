@@ -26,4 +26,6 @@ export interface NaClDriver {
   decode_utf8(data: Uint8Array): Promise<string>;
   to_hex(data: Uint8Array): Promise<string>;
   from_hex(data: string): Promise<Uint8Array>;
+
+  h2(data: string): Promise<Uint8Array>;
 }

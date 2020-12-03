@@ -1,10 +1,11 @@
 import { NaCl } from './nacl';
+import { NaClDriver } from './nacl-driver.interface';
 
 describe('NaCl', () => {
-  let nacl: NaCl;
+  let nacl: NaClDriver;
 
   beforeEach(() => {
-    nacl = new NaCl();
+    nacl = NaCl.instance();
   });
 
   it('crypto_secretbox', async () => {

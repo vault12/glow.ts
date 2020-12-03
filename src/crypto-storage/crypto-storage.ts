@@ -12,8 +12,7 @@ export class CryptoStorage {
   static async new(storageDriver: StorageDriver, rootKey?: string): Promise<CryptoStorage> {
     const storage = new CryptoStorage();
     storage.driver = storageDriver;
-    const nacl = new NaCl();
-    storage.storageKey = await nacl.random_bytes(nacl.crypto_secretbox_KEYBYTES);
+    storage.storageKey = await NaCl.instance().random_bytes(NaCl.instance().crypto_secretbox_KEYBYTES);
     storage.rootKey = rootKey ? `.${rootKey}${config.STORAGE_ROOT}` : config.STORAGE_ROOT;
     return storage;
   }
@@ -24,11 +23,10 @@ export class CryptoStorage {
     }
     // Convert the data to JSON, then convert that string to a byte array
     const input = JSON.stringify(data);
-    const nacl = new NaCl();
-    const encoded = await nacl.encode_utf8(input);
+    const encoded = await NaCl.instance().encode_utf8(input);
     // For each item in the store we also generate and save its own nonce
-    const nonce = await nacl.crypto_secretbox_random_nonce();
-    const cipherText = await nacl.crypto_secretbox(encoded, nonce, this.storageKey);
+    const nonce = await NaCl.instance().crypto_secretbox_random_nonce();
+    const cipherText = await NaCl.instance().crypto_secretbox(encoded, nonce, this.storageKey);
     // Save the cipher text and nonce
     await this.driver.set(this.addPrefix(tag), Utils.toBase64(Utils.decode_latin1(cipherText)));
     await this.driver.set(this.addPrefix(this.addNonceTag(tag)), Utils.toBase64(Utils.decode_latin1(nonce)));
@@ -48,10 +46,9 @@ export class CryptoStorage {
     }
     const dataBinary = Utils.encode_latin1(Utils.fromBase64(data));
     const nonceBinary = Utils.encode_latin1(Utils.fromBase64(nonce));
-    const nacl = new NaCl();
-    const source = await nacl.crypto_secretbox_open(dataBinary, nonceBinary, this.storageKey);
+    const source = await NaCl.instance().crypto_secretbox_open(dataBinary, nonceBinary, this.storageKey);
     if (source) {
-      const decoded = await nacl.decode_utf8(source);
+      const decoded = await NaCl.instance().decode_utf8(source);
       return JSON.parse(decoded);
     } else {
       return null;

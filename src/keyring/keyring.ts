@@ -81,15 +81,14 @@ export class KeyRing {
     if (!this.storage) {
       return;
     }
-    const nacl = new NaCl();
     const commKey = await this.getKey('comm_key');
     if (commKey) {
       this.commKey = commKey;
-      this.hpk = await nacl.h2(this.commKey.publicKey);
+      this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
     } else {
-      const keypair = await nacl.crypto_box_keypair();
+      const keypair = await NaCl.instance().crypto_box_keypair();
       this.commKey = new Keys(keypair);
-      this.hpk = await nacl.h2(this.commKey.publicKey);
+      this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
       await this.storage.save('comm_key', this.commKey);
     }
   }
@@ -126,9 +125,8 @@ export class KeyRing {
     if (!this.storage) {
       return;
     }
-    const nacl = new NaCl();
-    this.commKey = new Keys(await nacl.crypto_box_keypair_from_seed(seed));
-    this.hpk = await nacl.h2(this.commKey.publicKey);
+    this.commKey = new Keys(await NaCl.instance().crypto_box_keypair_from_seed(seed));
+    this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
     await this.storage.save('comm_key', this.commKey);
   }
 
@@ -136,9 +134,8 @@ export class KeyRing {
     if (!this.storage) {
       return;
     }
-    const nacl = new NaCl();
-    this.commKey = new Keys(await nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
-    this.hpk = await nacl.h2(this.commKey.publicKey);
+    this.commKey = new Keys(await NaCl.instance().crypto_box_keypair_from_raw_sk(rawSecretKey));
+    this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
     await this.storage.save('comm_key', this.commKey);
   }
 
@@ -169,8 +166,7 @@ export class KeyRing {
   }
 
   private async processGuest(guestTag: string, b64_pk: string, isTemporary?: boolean): Promise<string> {
-    const nacl = new NaCl();
-    const b64_h2 = Utils.toBase64(Utils.decode_latin1(await nacl.h2(b64_pk)));
+    const b64_h2 = Utils.toBase64(Utils.decode_latin1(await NaCl.instance().h2(b64_pk)));
     this.guestKeys.set(guestTag, {
       pk: b64_pk,
       hpk: b64_h2,
