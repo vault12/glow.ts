@@ -1,22 +1,22 @@
 import { KeyRing } from './keyring';
-import { Nacl } from '../nacl/nacl';
+import { NaCl } from '../nacl/nacl';
 import { Keys } from '../keys/keys';
 import { config } from '../config';
 
 describe('Keyring', () => {
   let ring1: KeyRing;
   let ring2: KeyRing;
-  let nacl: Nacl;
+  let nacl: NaCl;
 
   beforeEach(async () => {
     ring1 = await KeyRing.new();
     ring2 = await KeyRing.new();
-    nacl = new Nacl();
+    nacl = new NaCl();
   });
 
   it('add guests', async () => {
-    const keys1 = new Keys(nacl.crypto_box_keypair());
-    const keys2 = new Keys(nacl.crypto_box_keypair());
+    const keys1 = new Keys(await nacl.crypto_box_keypair());
+    const keys2 = new Keys(await nacl.crypto_box_keypair());
 
     await ring1.addGuest('Alice', keys1.publicKey);
     expect(ring1.getNumberOfGuests()).toBe(1);
@@ -30,7 +30,7 @@ describe('Keyring', () => {
   it('backup and restore', async () => {
     const originalRing = await KeyRing.new();
     for (let i = 0; i < 10; i++) {
-      const keys = new Keys(nacl.crypto_box_keypair());
+      const keys = new Keys(await nacl.crypto_box_keypair());
       await originalRing.addGuest(`keys${i}`, keys.publicKey);
     }
 
@@ -46,12 +46,12 @@ describe('Keyring', () => {
     expect(backup).toBe(backedUpAgain);
   });
 
-  it.only('temporary keys', async () => {
+  it('temporary keys', async () => {
     jest.useFakeTimers();
     // mock config value
     config.RELAY_SESSION_TIMEOUT = 100;
     const ring = await KeyRing.new();
-    const keys = new Keys(nacl.crypto_box_keypair());
+    const keys = new Keys(await nacl.crypto_box_keypair());
     await ring.addTempGuest('temp', keys.publicKey);
     // the key has to exist before we run the timer
     expect(ring.getGuestKey('temp')).not.toBeNull();

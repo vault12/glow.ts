@@ -4,8 +4,8 @@ import { LocalStorageDriver } from './local-storage.driver';
 describe('CryptoStorage', () => {
   let storage: CryptoStorage;
 
-  beforeEach(() => {
-    storage = new CryptoStorage(new LocalStorageDriver());
+  beforeEach(async () => {
+    storage = await CryptoStorage.new(new LocalStorageDriver());
   });
 
   it('encrypted write/read', async () => {

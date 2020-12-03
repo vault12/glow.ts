@@ -4,39 +4,48 @@ import { sha256 } from 'js-sha256';
 import { NaClDriver } from './nacl-driver.interface';
 import { CryptoBoxKeypair } from './crypto-box-keypair.interface';
 
-export class Nacl implements NaClDriver {
+/**
+ * Implementation based on TweetNaCl.js: {@link https://github.com/dchest/tweetnacl-js}.
+ * SHA256 is taken separately from `js-sha256` library, because TweetNacl only offers
+ * SHA512 as hashing function, which is incompatible with the current Zax version.
+ * {@link https://github.com/emn178/js-sha256}
+ *
+ * All the methods of this class are actually synchronous, but they are defined
+ * as async to conform to the NaClDriver interface, which may have other implementations.
+ */
+export class NaCl implements NaClDriver {
 
-  // Secret-key authenticated encryption (secretbox)
+  // -----------------------------------------------------------------------------
+  // NaCl driver implmentation
 
   crypto_secretbox_KEYBYTES = secretbox.keyLength;
 
-  crypto_secretbox_random_nonce(): Uint8Array {
+  async crypto_secretbox_random_nonce(): Promise<Uint8Array> {
     return randomBytes(secretbox.nonceLength);
   }
 
-  crypto_secretbox(message: Uint8Array, nonce: Uint8Array, key: Uint8Array): Uint8Array {
+  async crypto_secretbox(message: Uint8Array, nonce: Uint8Array, key: Uint8Array): Promise<Uint8Array> {
     return secretbox(message, nonce, key);
   }
 
-  crypto_secretbox_open(box: Uint8Array, nonce: Uint8Array, key: Uint8Array): Uint8Array | null {
+  async crypto_secretbox_open(box: Uint8Array, nonce: Uint8Array, key: Uint8Array): Promise<Uint8Array | null> {
     return secretbox.open(box, nonce, key);
   }
 
-  // Public-key authenticated encryption (box)
-
-  crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Uint8Array {
+  async crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array> {
     return box(message, nonce, pk, sk);
   }
 
-  crypto_box_open(ciphertext: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Uint8Array | null {
-    return box.open(ciphertext, nonce, pk, sk);
+  async crypto_box_open(
+    cipher: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array | null> {
+    return box.open(cipher, nonce, pk, sk);
   }
 
-  crypto_box_random_nonce(): Uint8Array {
+  async crypto_box_random_nonce(): Promise<Uint8Array> {
     return randomBytes(box.nonceLength);
   }
 
-  crypto_box_keypair(): CryptoBoxKeypair {
+  async crypto_box_keypair(): Promise<CryptoBoxKeypair> {
     const pair: BoxKeyPair = box.keyPair();
     return {
       boxPk: pair.publicKey,
@@ -44,7 +53,7 @@ export class Nacl implements NaClDriver {
     };
   }
 
-  crypto_box_keypair_from_raw_sk(key: Uint8Array): CryptoBoxKeypair {
+  async crypto_box_keypair_from_raw_sk(key: Uint8Array): Promise<CryptoBoxKeypair> {
     const pair: BoxKeyPair = box.keyPair.fromSecretKey(key);
     return {
       boxPk: pair.publicKey,
@@ -52,26 +61,22 @@ export class Nacl implements NaClDriver {
     };
   }
 
-  crypto_box_keypair_from_seed(seed: Uint8Array): CryptoBoxKeypair {
-    return this.crypto_box_keypair_from_raw_sk(this.crypto_hash_sha256(seed).subarray(0, box.secretKeyLength));
+  async crypto_box_keypair_from_seed(seed: Uint8Array): Promise<CryptoBoxKeypair> {
+    return this.crypto_box_keypair_from_raw_sk((await this.crypto_hash_sha256(seed)).subarray(0, box.secretKeyLength));
   }
 
-  // Hashing
-
-  crypto_hash_sha256(data: Uint8Array): Uint8Array {
+  async crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array> {
     return this.from_hex(sha256(data));
   }
 
-  // Randomness
-
-  random_bytes(size: number): Uint8Array {
+  async random_bytes(size: number): Promise<Uint8Array> {
     return randomBytes(size);
   }
 
   // Helper methods are based on `js-nacl` implementations
   // https://github.com/tonyg/js-nacl/blob/cc70775cfc9d68a04905ca65c7f179b33a18066e/nacl_cooked.js
 
-  encode_latin1(data: string): Uint8Array {
+  async encode_latin1(data: string): Promise<Uint8Array> {
     const result = new Uint8Array(data.length);
     for (let i = 0; i < data.length; i++) {
       const c = data.charCodeAt(i);
@@ -81,7 +86,7 @@ export class Nacl implements NaClDriver {
     return result;
   }
 
-  decode_latin1(data: Uint8Array): string {
+  async decode_latin1(data: Uint8Array): Promise<string> {
     const encoded = [];
     for (let i = 0; i < data.length; i++) {
       encoded.push(String.fromCharCode(data[i]));
@@ -89,15 +94,15 @@ export class Nacl implements NaClDriver {
     return encoded.join('');
   }
 
-  encode_utf8(data: string): Uint8Array {
+  async encode_utf8(data: string): Promise<Uint8Array> {
     return this.encode_latin1(unescape(encodeURIComponent(data)));
   }
 
-  decode_utf8(data: Uint8Array): string {
-    return decodeURIComponent(escape(this.decode_latin1(data)));
+  async decode_utf8(data: Uint8Array): Promise<string> {
+    return decodeURIComponent(escape(await this.decode_latin1(data)));
   }
 
-  to_hex(data: Uint8Array): string {
+  async to_hex(data: Uint8Array): Promise<string> {
     const encoded = [];
     for (let i = 0; i < data.length; i++) {
       encoded.push('0123456789abcdef'[(data[i] >> 4) & 15]);
@@ -106,7 +111,7 @@ export class Nacl implements NaClDriver {
     return encoded.join('');
   }
 
-  from_hex(data: string): Uint8Array {
+  async from_hex(data: string): Promise<Uint8Array> {
     const result = new Uint8Array(data.length / 2);
     for (let i = 0; i < data.length / 2; i++) {
       result[i] = parseInt(data.substr(2 * i, 2), 16);
@@ -114,15 +119,19 @@ export class Nacl implements NaClDriver {
     return result;
   }
 
+  // -----------------------------------------------------------------------------
+  // Additional helper methods
 
-  // h2(m) = sha256(sha256(64x0 + m))
-  // Zero out initial sha256 block, and double hash 0-padded message
-  // http://cs.nyu.edu/~dodis/ps/h-of-h.pdf
-  h2(data: string): Uint8Array {
-    const source = this.encode_latin1(data);
+  /**
+   * h2(m) = sha256(sha256(64x0 + m))
+   * Zero out initial sha256 block, and double hash 0-padded message
+   * http://cs.nyu.edu/~dodis/ps/h-of-h.pdf
+   */
+  async h2(data: string): Promise<Uint8Array> {
+    const source = await this.encode_latin1(data);
     const extendedSource = new Uint8Array(64 + source.length);
     extendedSource.fill(0);
     extendedSource.set(source, 64);
-    return this.crypto_hash_sha256(this.crypto_hash_sha256(extendedSource));
+    return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
   }
 }
