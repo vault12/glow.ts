@@ -1,5 +1,6 @@
 import { NaCl } from './nacl';
 import { NaClDriver } from './nacl-driver.interface';
+import { Utils } from '../utils/utils';
 
 describe('NaCl', () => {
   let nacl: NaClDriver;
@@ -15,6 +16,42 @@ describe('NaCl', () => {
     const encrypted = await nacl.crypto_secretbox(input, nonce, key);
     const decrypted = await nacl.crypto_secretbox_open(encrypted, nonce, key);
     expect(decrypted).toEqual(input);
+  });
+
+  it('crypto_box_keypair', async () => {
+    const keys = await nacl.crypto_box_keypair();
+    expect(keys.boxPk).toBeTruthy();
+    expect(keys.boxSk).toBeTruthy();
+    expect(keys.boxPk).not.toEqual(keys.boxSk);
+    expect(keys.boxPk.length).toBe(keys.boxSk.length);
+  });
+
+  it('crypto_box', async () => {
+    const alice = await nacl.crypto_box_keypair();
+    const bob = await nacl.crypto_box_keypair();
+    const nonce = await nacl.crypto_box_random_nonce();
+
+    const message = await nacl.random_bytes(100);
+
+    const aliceEncryptedMessage = await nacl.crypto_box(message, nonce, bob.boxPk, alice.boxSk);
+    const bobDecryptedMessage = await nacl.crypto_box_open(aliceEncryptedMessage, nonce, alice.boxPk, bob.boxSk);
+    expect(bobDecryptedMessage).toEqual(message);
+  });
+
+  it('crypto_box_keypair_from_raw_sk', async () => {
+    const keys = await nacl.crypto_box_keypair();
+    const restoredKeys = await nacl.crypto_box_keypair_from_raw_sk(keys.boxSk);
+    expect(keys.boxPk).toEqual(restoredKeys.boxPk);
+    expect(keys.boxSk).toEqual(restoredKeys.boxSk);
+  });
+
+  it('crypto_box_keypair_from_seed', async () => {
+    const input = new Uint8Array([1,2,3]);
+    const keysFromSeed = await nacl.crypto_box_keypair_from_seed(input);
+    expect(Utils.toBase64(Utils.decode_latin1(keysFromSeed.boxPk)))
+      .toEqual('yprjMh3kE7/6+wrju7aehal7g88mZ9jK1818dPdhwB4=');
+    expect(Utils.toBase64(Utils.decode_latin1(keysFromSeed.boxSk)))
+      .toEqual('J4ZMxSGalRp6blK4yN3faYHQmNoWWNliWMhwssiN+8s=');
   });
 
   it('crypto_hash_sha256', async () => {

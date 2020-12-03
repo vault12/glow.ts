@@ -62,7 +62,8 @@ export class KeyRing {
     const keyRecord = this.guestKeys.get(guestTag);
     if (keyRecord) {
       return new Keys({
-        boxPk: Utils.encode_latin1(Utils.fromBase64(keyRecord.pk))
+        boxPk: Utils.encode_latin1(Utils.fromBase64(keyRecord.pk)),
+        boxSk: new Uint8Array()
       });
     }
     return null;

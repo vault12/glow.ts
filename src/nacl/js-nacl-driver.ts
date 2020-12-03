@@ -1,4 +1,4 @@
-import { box, BoxKeyPair, randomBytes, secretbox } from 'tweetnacl';
+import { box, BoxKeyPair, randomBytes, secretbox, hash } from 'tweetnacl';
 import { sha256 } from 'js-sha256';
 
 import { NaClDriver } from './nacl-driver.interface';
@@ -58,7 +58,8 @@ export class JsNaClDriver implements NaClDriver {
   }
 
   async crypto_box_keypair_from_seed(seed: Uint8Array): Promise<CryptoBoxKeypair> {
-    return this.crypto_box_keypair_from_raw_sk((await this.crypto_hash_sha256(seed)).subarray(0, box.secretKeyLength));
+    // using SHA512 to hash, per original NaCl docs
+    return this.crypto_box_keypair_from_raw_sk(hash(seed).subarray(0, box.secretKeyLength));
   }
 
   async crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array> {
