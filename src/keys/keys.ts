@@ -1,6 +1,10 @@
 import { Base64, Utils } from '../utils/utils';
 import { CryptoBoxKeypair } from '../nacl/crypto-box-keypair.interface';
 
+/**
+ * A simple wrapper around a public/private keys pair.
+ * Stores keys in base64 format.
+ */
 export class Keys {
   private keyPair: CryptoBoxKeypair;
 
@@ -31,10 +35,7 @@ export class Keys {
     return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxPk));
   }
 
-  get privateKey(): Base64 | null {
-    if (this.keyPair.boxSk) {
-      return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxSk));
-    }
-    return null;
+  get privateKey(): Base64 {
+    return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxSk));
   }
 }

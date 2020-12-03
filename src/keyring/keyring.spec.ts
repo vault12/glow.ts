@@ -2,6 +2,7 @@ import { KeyRing } from './keyring';
 import { NaCl } from '../nacl/nacl';
 import { Keys } from '../keys/keys';
 import { config } from '../config';
+import { Utils } from '../utils/utils';
 
 describe('Keyring', () => {
   let ring1: KeyRing;
@@ -12,17 +13,34 @@ describe('Keyring', () => {
     ring2 = await KeyRing.new();
   });
 
-  it('add guests', async () => {
+  it('add/remove guests', async () => {
     const keys1 = new Keys(await NaCl.instance().crypto_box_keypair());
     const keys2 = new Keys(await NaCl.instance().crypto_box_keypair());
 
     await ring1.addGuest('Alice', keys1.publicKey);
     expect(ring1.getNumberOfGuests()).toBe(1);
-    expect(ring1.guestKeys.get('Alice')).not.toBeNull();
+    expect(ring1.guestKeys.get('Alice')).toBeDefined();
 
     await ring1.addGuest('Bob', keys2.publicKey);
     expect(ring1.getNumberOfGuests()).toBe(2);
-    expect(ring1.guestKeys.get('Bob')).not.toBeNull();
+    expect(ring1.guestKeys.get('Bob')).toBeDefined();
+
+    await ring1.removeGuest('Alice');
+    expect(ring1.getNumberOfGuests()).toBe(1);
+    expect(ring1.guestKeys.get('Alice')).not.toBeDefined();
+    expect(ring1.guestKeys.get('Bob')).toBeDefined();
+  });
+
+  it('get tags and keys', async() => {
+    const ring = await KeyRing.new();
+    const commKey = ring.getPubCommKey();
+    expect(typeof commKey).toBe('string');
+
+    const aliceKey = new Keys(await NaCl.instance().crypto_box_keypair());
+    await ring.addGuest('Alice', aliceKey.publicKey);
+    const hpk = Utils.toBase64(Utils.decode_latin1(await NaCl.instance().h2(aliceKey.publicKey)));
+    expect(ring.getTagByHpk(hpk)).not.toBeNull();
+    expect(ring.getTagByHpk('Bob')).toBeNull();
   });
 
   it('backup and restore', async () => {
