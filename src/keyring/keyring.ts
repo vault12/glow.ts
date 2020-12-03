@@ -68,6 +68,15 @@ export class KeyRing {
     return null;
   }
 
+  getTimeToGuestExpiration(guestTag: string): number {
+    const timeout = this.guestKeyTimeouts.get(guestTag);
+    if (timeout) {
+      return Math.max(0, config.RELAY_SESSION_TIMEOUT - (Date.now() - timeout.startTime));
+    } else {
+      return 0;
+    }
+  }
+
   private async loadCommKey() {
     const nacl = new Nacl();
     const commKey = await this.getKey('comm_key');
