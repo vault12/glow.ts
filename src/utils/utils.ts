@@ -1,14 +1,18 @@
 export type Base64 = string;
 
 export class Utils {
-  static toBase64(input: string): Base64 {
+  static toBase64(input: Uint8Array): Base64 {
     const isBrowser = typeof btoa !== 'undefined';
-    return isBrowser ? btoa(input) : Buffer.from(input, 'utf-8').toString('base64');
+    return isBrowser ?
+      btoa(this.decode_latin1(input)) :
+      Buffer.from(this.decode_latin1(input), 'utf-8').toString('base64');
   }
 
-  static fromBase64(input: Base64): string {
+  static fromBase64(input: Base64): Uint8Array {
     const isBrowser = typeof btoa !== 'undefined';
-    return isBrowser ? atob(input) : Buffer.from(input, 'base64').toString('utf-8');
+    return isBrowser ?
+      this.encode_latin1(atob(input)) :
+      this.encode_latin1(Buffer.from(input, 'base64').toString('utf-8'));
   }
 
   static encode_latin1(data: string): Uint8Array {
@@ -28,5 +32,4 @@ export class Utils {
     }
     return encoded.join('');
   }
-
 }

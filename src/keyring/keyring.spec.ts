@@ -38,7 +38,7 @@ describe('Keyring', () => {
 
     const aliceKey = new Keys(await NaCl.instance().crypto_box_keypair());
     await ring.addGuest('Alice', aliceKey.publicKey);
-    const hpk = Utils.toBase64(Utils.decode_latin1(await NaCl.instance().h2(aliceKey.publicKey)));
+    const hpk = Utils.toBase64(await NaCl.instance().h2(aliceKey.publicKey));
     expect(ring.getTagByHpk(hpk)).not.toBeNull();
     expect(ring.getTagByHpk('Bob')).toBeNull();
   });

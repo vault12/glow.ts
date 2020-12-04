@@ -48,10 +48,8 @@ describe('NaCl', () => {
   it('crypto_box_keypair_from_seed', async () => {
     const input = new Uint8Array([1,2,3]);
     const keysFromSeed = await nacl.crypto_box_keypair_from_seed(input);
-    expect(Utils.toBase64(Utils.decode_latin1(keysFromSeed.boxPk)))
-      .toEqual('yprjMh3kE7/6+wrju7aehal7g88mZ9jK1818dPdhwB4=');
-    expect(Utils.toBase64(Utils.decode_latin1(keysFromSeed.boxSk)))
-      .toEqual('J4ZMxSGalRp6blK4yN3faYHQmNoWWNliWMhwssiN+8s=');
+    expect(Utils.toBase64(keysFromSeed.boxPk)).toEqual('yprjMh3kE7/6+wrju7aehal7g88mZ9jK1818dPdhwB4=');
+    expect(Utils.toBase64(keysFromSeed.boxSk)).toEqual('J4ZMxSGalRp6blK4yN3faYHQmNoWWNliWMhwssiN+8s=');
   });
 
   it('crypto_hash_sha256', async () => {

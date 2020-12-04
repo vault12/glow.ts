@@ -62,7 +62,7 @@ export class KeyRing {
     const keyRecord = this.guestKeys.get(guestTag);
     if (keyRecord) {
       return new Keys({
-        boxPk: Utils.encode_latin1(Utils.fromBase64(keyRecord.pk)),
+        boxPk: Utils.fromBase64(keyRecord.pk),
         boxSk: new Uint8Array()
       });
     }
@@ -112,7 +112,7 @@ export class KeyRing {
 
   static async fromBackup(id: string, backup: string): Promise<KeyRing> {
     const backupObject = JSON.parse(backup);
-    const strCommKey = Utils.encode_latin1(Utils.fromBase64(backupObject[config.COMM_KEY_TAG]));
+    const strCommKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
     delete backupObject[config.COMM_KEY_TAG];
     const restoredKeyRing = await KeyRing.new();
     restoredKeyRing.commFromSecKey(strCommKey);
@@ -167,7 +167,7 @@ export class KeyRing {
   }
 
   private async processGuest(guestTag: string, b64_pk: string, isTemporary?: boolean): Promise<string> {
-    const b64_h2 = Utils.toBase64(Utils.decode_latin1(await NaCl.instance().h2(b64_pk)));
+    const b64_h2 = Utils.toBase64(await NaCl.instance().h2(b64_pk));
     this.guestKeys.set(guestTag, {
       pk: b64_pk,
       hpk: b64_h2,

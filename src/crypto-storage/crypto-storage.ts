@@ -28,8 +28,8 @@ export class CryptoStorage {
     const nonce = await NaCl.instance().crypto_secretbox_random_nonce();
     const cipherText = await NaCl.instance().crypto_secretbox(encoded, nonce, this.storageKey);
     // Save the cipher text and nonce
-    await this.driver.set(this.addPrefix(tag), Utils.toBase64(Utils.decode_latin1(cipherText)));
-    await this.driver.set(this.addPrefix(this.addNonceTag(tag)), Utils.toBase64(Utils.decode_latin1(nonce)));
+    await this.driver.set(this.addPrefix(tag), Utils.toBase64(cipherText));
+    await this.driver.set(this.addPrefix(this.addNonceTag(tag)), Utils.toBase64(nonce));
     return true;
   }
 
@@ -44,8 +44,8 @@ export class CryptoStorage {
     if (!data || !nonce) {
       return null;
     }
-    const dataBinary = Utils.encode_latin1(Utils.fromBase64(data));
-    const nonceBinary = Utils.encode_latin1(Utils.fromBase64(nonce));
+    const dataBinary = Utils.fromBase64(data);
+    const nonceBinary = Utils.fromBase64(nonce);
     const source = await NaCl.instance().crypto_secretbox_open(dataBinary, nonceBinary, this.storageKey);
     if (source) {
       const decoded = await NaCl.instance().decode_utf8(source);

@@ -12,8 +12,8 @@ export class Keys {
     if (typeof keys === 'string') {
       const { boxPk, boxSk } = JSON.parse(keys);
       this.keyPair = {
-        boxPk: Utils.encode_latin1(Utils.fromBase64(boxPk)),
-        boxSk: Utils.encode_latin1(Utils.fromBase64(boxSk))
+        boxPk: Utils.fromBase64(boxPk),
+        boxSk: Utils.fromBase64(boxSk)
       };
     } else {
       this.keyPair = keys;
@@ -32,10 +32,10 @@ export class Keys {
   }
 
   get publicKey(): Base64 {
-    return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxPk));
+    return Utils.toBase64(this.keyPair.boxPk);
   }
 
   get privateKey(): Base64 {
-    return Utils.toBase64(Utils.decode_latin1(this.keyPair.boxSk));
+    return Utils.toBase64(this.keyPair.boxSk);
   }
 }
