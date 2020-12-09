@@ -64,7 +64,7 @@ export class CryptoStorage {
       const decoded = await this.nacl.decode_utf8(source);
       return JSON.parse(decoded);
     } else {
-      return null;
+      throw new Error('crypto_secretbox_open: decryption error');
     }
   }
 

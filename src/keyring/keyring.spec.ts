@@ -5,32 +5,28 @@ import { config } from '../config';
 import { Utils } from '../utils/utils';
 
 describe('Keyring', () => {
-  let ring1: KeyRing;
-
-  beforeEach(async () => {
-    ring1 = await KeyRing.new();
-  });
-
   it('add/remove guests', async () => {
+    const ring = await KeyRing.new('test1');
+
     const keys1 = new Keys(await NaCl.instance().crypto_box_keypair());
     const keys2 = new Keys(await NaCl.instance().crypto_box_keypair());
 
-    await ring1.addGuest('Alice', keys1.publicKey);
-    expect(ring1.getNumberOfGuests()).toBe(1);
-    expect(ring1.guestKeys.get('Alice')).toBeDefined();
+    await ring.addGuest('Alice', keys1.publicKey);
+    expect(ring.getNumberOfGuests()).toBe(1);
+    expect(ring.guestKeys.get('Alice')).toBeDefined();
 
-    await ring1.addGuest('Bob', keys2.publicKey);
-    expect(ring1.getNumberOfGuests()).toBe(2);
-    expect(ring1.guestKeys.get('Bob')).toBeDefined();
+    await ring.addGuest('Bob', keys2.publicKey);
+    expect(ring.getNumberOfGuests()).toBe(2);
+    expect(ring.guestKeys.get('Bob')).toBeDefined();
 
-    await ring1.removeGuest('Alice');
-    expect(ring1.getNumberOfGuests()).toBe(1);
-    expect(ring1.guestKeys.get('Alice')).not.toBeDefined();
-    expect(ring1.guestKeys.get('Bob')).toBeDefined();
+    await ring.removeGuest('Alice');
+    expect(ring.getNumberOfGuests()).toBe(1);
+    expect(ring.guestKeys.get('Alice')).not.toBeDefined();
+    expect(ring.guestKeys.get('Bob')).toBeDefined();
   });
 
   it('get tags and keys', async() => {
-    const ring = await KeyRing.new();
+    const ring = await KeyRing.new('test2');
     const commKey = ring.getPubCommKey();
     expect(typeof commKey).toBe('string');
 
@@ -42,7 +38,7 @@ describe('Keyring', () => {
   });
 
   it('backup and restore', async () => {
-    const originalRing = await KeyRing.new();
+    const originalRing = await KeyRing.new('test3');
     for (let i = 0; i < 10; i++) {
       const keys = new Keys(await NaCl.instance().crypto_box_keypair());
       await originalRing.addGuest(`keys${i}`, keys.publicKey);
@@ -50,7 +46,7 @@ describe('Keyring', () => {
 
     const backup = await originalRing.backup();
 
-    const restored = await KeyRing.fromBackup('id', backup);
+    const restored = await KeyRing.fromBackup('test4', backup);
     const backedUpAgain = await restored.backup();
 
     expect(originalRing.commKey).toEqual(restored.commKey);
@@ -64,7 +60,7 @@ describe('Keyring', () => {
     jest.useFakeTimers();
     // mock config value
     config.RELAY_SESSION_TIMEOUT = 100;
-    const ring = await KeyRing.new();
+    const ring = await KeyRing.new('test5');
     const keys = new Keys(await NaCl.instance().crypto_box_keypair());
     await ring.addTempGuest('temp', keys.publicKey);
     // the key has to exist before we run the timer

@@ -33,9 +33,9 @@ export class KeyRing {
     this.guestKeyTimeouts = new Map();
   }
 
-  static async new(): Promise<KeyRing> {
+  static async new(id: string): Promise<KeyRing> {
     const keyRing = new KeyRing();
-    keyRing.storage = await CryptoStorage.new(new LocalStorageDriver());
+    keyRing.storage = await CryptoStorage.new(new LocalStorageDriver(), id);
     await keyRing.loadCommKey();
     await keyRing.loadGuestKeys();
     return keyRing;
@@ -114,7 +114,7 @@ export class KeyRing {
     const backupObject = JSON.parse(backup);
     const strCommKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
     delete backupObject[config.COMM_KEY_TAG];
-    const restoredKeyRing = await KeyRing.new();
+    const restoredKeyRing = await KeyRing.new(id);
     restoredKeyRing.commFromSecKey(strCommKey);
     for (const [key, value] of Object.entries(backupObject)) {
       await restoredKeyRing.addGuest(key, value as string);

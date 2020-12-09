@@ -5,7 +5,7 @@ describe('CryptoStorage', () => {
   let storage: CryptoStorage;
 
   beforeEach(async () => {
-    storage = await CryptoStorage.new(new LocalStorageDriver());
+    storage = await CryptoStorage.new(new LocalStorageDriver(), 'test');
   });
 
   it('encrypted write/read', async () => {
