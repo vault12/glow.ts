@@ -6,11 +6,9 @@ import { Utils } from '../utils/utils';
 
 describe('Keyring', () => {
   let ring1: KeyRing;
-  let ring2: KeyRing;
 
   beforeEach(async () => {
     ring1 = await KeyRing.new();
-    ring2 = await KeyRing.new();
   });
 
   it('add/remove guests', async () => {

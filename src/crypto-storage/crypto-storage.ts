@@ -9,6 +9,9 @@ export class CryptoStorage {
   private rootKey?: string;
   private storageKey?: Uint8Array;
 
+  private constructor() {
+  }
+
   static async new(storageDriver: StorageDriver, rootKey?: string): Promise<CryptoStorage> {
     const storage = new CryptoStorage();
     storage.driver = storageDriver;

@@ -65,7 +65,9 @@ describe('NaCl', () => {
   it('hex encoding', async () => {
     expect(await nacl.to_hex(await nacl.encode_utf8('hello'))).toBe('68656c6c6f');
 
+    // Lowercase hex
     expect(await nacl.decode_utf8(await nacl.from_hex('68656c6c6f'))).toBe('hello');
+    // Uppercase hex
     expect(await nacl.decode_utf8(await nacl.from_hex('68656C6C6F'))).toBe('hello');
   });
 
