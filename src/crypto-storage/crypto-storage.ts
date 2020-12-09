@@ -21,8 +21,11 @@ export class CryptoStorage {
   }
 
   async save(tag: string, data: unknown): Promise<boolean> {
-    if (!this.driver || !this.storageKey) {
-      return false;
+    if (!this.driver) {
+      throw new Error('Storage driver is not set');
+    }
+    if (!this.storageKey) {
+      throw new Error('Storage key is not set');
     }
     // Convert the data to JSON, then convert that string to a byte array
     const input = JSON.stringify(data);
@@ -32,17 +35,20 @@ export class CryptoStorage {
     const cipherText = await NaCl.instance().crypto_secretbox(encoded, nonce, this.storageKey);
     // Save the cipher text and nonce
     await this.driver.set(this.addPrefix(tag), Utils.toBase64(cipherText));
-    await this.driver.set(this.addPrefix(this.addNonceTag(tag)), Utils.toBase64(nonce));
+    await this.driver.set(this.addNonceTag(tag), Utils.toBase64(nonce));
     return true;
   }
 
   async get(tag: string): Promise<unknown> {
-    if (!this.driver || !this.storageKey) {
-      return false;
+    if (!this.driver) {
+      throw new Error('Storage driver is not set');
+    }
+    if (!this.storageKey) {
+      throw new Error('Storage key is not set');
     }
     // Get cipher text and nonce from the storage
     const data = await this.driver.get(this.addPrefix(tag));
-    const nonce = await this.driver.get(this.addPrefix(this.addNonceTag(tag)));
+    const nonce = await this.driver.get(this.addNonceTag(tag));
     // Nothing to do without cipher text or nonce
     if (!data || !nonce) {
       return null;
@@ -60,10 +66,10 @@ export class CryptoStorage {
 
   async remove(tag: string): Promise<boolean> {
     if (!this.driver) {
-      return false;
+      throw new Error('Storage driver is not set');
     }
     await this.driver.remove(this.addPrefix(tag));
-    await this.driver.remove(this.addPrefix(this.addNonceTag(tag)));
+    await this.driver.remove(this.addNonceTag(tag));
     return true;
   }
 
@@ -73,6 +79,6 @@ export class CryptoStorage {
   }
 
   private addNonceTag(tag: string): string {
-    return `${config.NONCE_TAG}.${tag}`;
+    return this.addPrefix(`${config.NONCE_TAG}.${tag}`);
   }
 }

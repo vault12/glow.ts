@@ -8,6 +8,9 @@ import { JsNaClDriver } from './js-nacl-driver';
 export class NaCl {
   private static driverInstance?: NaClDriver;
 
+  private constructor() {
+  }
+
   public static instance(driver?: NaClDriver): NaClDriver {
     if (!this.driverInstance) {
       // fallback to the default JS driver
