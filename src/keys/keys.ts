@@ -1,14 +1,14 @@
 import { Base64, Utils } from '../utils/utils';
-import { CryptoBoxKeypair } from '../nacl/crypto-box-keypair.interface';
+import { Keypair } from '../nacl/keypair.interface';
 
 /**
  * A simple wrapper around a public/private keys pair.
  * Stores keys in base64 format.
  */
 export class Keys {
-  private keyPair: CryptoBoxKeypair;
+  private keyPair: Keypair;
 
-  constructor(public keys: Base64 | CryptoBoxKeypair) {
+  constructor(public keys: Base64 | Keypair) {
     if (typeof keys === 'string') {
       const { boxPk, boxSk } = JSON.parse(keys);
       this.keyPair = {

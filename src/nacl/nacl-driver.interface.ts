@@ -1,4 +1,4 @@
-import { CryptoBoxKeypair } from './crypto-box-keypair.interface';
+import { Keypair } from './keypair.interface';
 
 export interface NaClDriver {
   // Secret-key authenticated encryption (secretbox)
@@ -11,9 +11,9 @@ export interface NaClDriver {
   crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array>;
   crypto_box_open(cipher: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array | null>;
   crypto_box_random_nonce(): Promise<Uint8Array>;
-  crypto_box_keypair(): Promise<CryptoBoxKeypair>;
-  crypto_box_keypair_from_raw_sk(key: Uint8Array): Promise<CryptoBoxKeypair>;
-  crypto_box_keypair_from_seed(seed: Uint8Array): Promise<CryptoBoxKeypair>;
+  crypto_box_keypair(): Promise<Keypair>;
+  crypto_box_keypair_from_raw_sk(key: Uint8Array): Promise<Keypair>;
+  crypto_box_keypair_from_seed(seed: Uint8Array): Promise<Keypair>;
 
   // Hashing
   crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array>;
