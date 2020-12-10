@@ -20,15 +20,15 @@ export class Keys {
     }
   }
 
+  static isEqual(keys1: Keys, keys2: Keys): boolean {
+    return keys1.toString() === keys2.toString();
+  }
+
   toString(): string {
     return JSON.stringify({
       boxPk: this.publicKey,
       boxSk: this.privateKey
     });
-  }
-
-  static isEqual(keys1: Keys, keys2: Keys): boolean {
-    return keys1.toString() === keys2.toString();
   }
 
   get publicKey(): Base64 {

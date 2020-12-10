@@ -39,6 +39,18 @@ export class KeyRing {
     return keyRing;
   }
 
+  static async fromBackup(id: string, backup: string): Promise<KeyRing> {
+    const backupObject = JSON.parse(backup);
+    const strCommKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
+    delete backupObject[config.COMM_KEY_TAG];
+    const restoredKeyRing = await KeyRing.new(id);
+    restoredKeyRing.commFromSecKey(strCommKey);
+    for (const [key, value] of Object.entries(backupObject)) {
+      await restoredKeyRing.addGuest(key, value as string);
+    }
+    return restoredKeyRing;
+  }
+
   getNumberOfGuests(): number {
     return this.guestKeys.size;
   }
@@ -110,18 +122,6 @@ export class KeyRing {
       }
     }
     return JSON.stringify(backupObject);
-  }
-
-  static async fromBackup(id: string, backup: string): Promise<KeyRing> {
-    const backupObject = JSON.parse(backup);
-    const strCommKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
-    delete backupObject[config.COMM_KEY_TAG];
-    const restoredKeyRing = await KeyRing.new(id);
-    restoredKeyRing.commFromSecKey(strCommKey);
-    for (const [key, value] of Object.entries(backupObject)) {
-      await restoredKeyRing.addGuest(key, value as string);
-    }
-    return restoredKeyRing;
   }
 
   async commFromSeed(seed: Uint8Array): Promise<void> {
