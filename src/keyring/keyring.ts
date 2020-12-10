@@ -22,6 +22,9 @@ interface KeyRingBackup {
 
 // Manages the set of public keys of counterparties
 export class KeyRing {
+  static readonly commKeyTag = 'comm_key';
+  static readonly guestRegistryTag = 'guest_registry';
+
   private storage?: CryptoStorage;
   private commKey?: Keys;
   private hpk?: Uint8Array;
@@ -96,7 +99,7 @@ export class KeyRing {
     if (!this.storage) {
       return;
     }
-    const commKey = await this.getKey('comm_key');
+    const commKey = await this.getKey(KeyRing.commKeyTag);
     if (commKey) {
       this.commKey = commKey;
       this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
@@ -104,7 +107,7 @@ export class KeyRing {
       const keypair = await NaCl.instance().crypto_box_keypair();
       this.commKey = new Keys(keypair);
       this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
-      await this.storage.save('comm_key', this.commKey);
+      await this.storage.save(KeyRing.commKeyTag, this.commKey);
     }
   }
 
@@ -130,7 +133,7 @@ export class KeyRing {
     }
     this.commKey = new Keys(await NaCl.instance().crypto_box_keypair_from_seed(seed));
     this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
-    await this.storage.save('comm_key', this.commKey);
+    await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
   async commFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
@@ -139,14 +142,14 @@ export class KeyRing {
     }
     this.commKey = new Keys(await NaCl.instance().crypto_box_keypair_from_raw_sk(rawSecretKey));
     this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
-    await this.storage.save('comm_key', this.commKey);
+    await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
   private async loadGuestKeys() {
     if (!this.storage) {
       return;
     }
-    const guestKeys = await this.storage.get('guest_registry');
+    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
     if (Array.isArray(guestKeys)) {
       this.guestKeys = new Map(guestKeys);
     }
@@ -203,7 +206,7 @@ export class KeyRing {
     if (!this.storage) {
       return;
     }
-    await this.storage.save('guest_registry', Array.from(this.guestKeys.entries()));
+    await this.storage.save(KeyRing.guestRegistryTag, Array.from(this.guestKeys.entries()));
   }
 
   private async getKey(tag: string) {
