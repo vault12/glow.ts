@@ -22,15 +22,13 @@ interface KeyRingBackup {
 
 // Manages the set of public keys of counterparties
 export class KeyRing {
-  public storage?: CryptoStorage;
-  public commKey?: Keys;
-  public hpk?: Uint8Array;
-  public guestKeys: Map<string, KeyRecord>;
-  public guestKeyTimeouts: Map<string, TempKeyTimeout>;
+  private storage?: CryptoStorage;
+  private commKey?: Keys;
+  private hpk?: Uint8Array;
+  private guestKeys: Map<string, KeyRecord> = new Map();
+  private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
 
   private constructor() {
-    this.guestKeys = new Map();
-    this.guestKeyTimeouts = new Map();
   }
 
   static async new(id: string): Promise<KeyRing> {
@@ -47,6 +45,10 @@ export class KeyRing {
 
   getPubCommKey(): string | undefined {
     return this.commKey?.publicKey;
+  }
+
+  getHpk(): string | undefined {
+    return this.hpk ? Utils.toBase64(this.hpk) : undefined;
   }
 
   getTagByHpk(hpk: string): string | null {

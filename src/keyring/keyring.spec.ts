@@ -13,16 +13,16 @@ describe('Keyring', () => {
 
     await ring.addGuest('Alice', keys1.publicKey);
     expect(ring.getNumberOfGuests()).toBe(1);
-    expect(ring.guestKeys.get('Alice')).toBeDefined();
+    expect(ring.getGuestKey('Alice')).toBeDefined();
 
     await ring.addGuest('Bob', keys2.publicKey);
     expect(ring.getNumberOfGuests()).toBe(2);
-    expect(ring.guestKeys.get('Bob')).toBeDefined();
+    expect(ring.getGuestKey('Bob')).toBeDefined();
 
     await ring.removeGuest('Alice');
     expect(ring.getNumberOfGuests()).toBe(1);
-    expect(ring.guestKeys.get('Alice')).not.toBeDefined();
-    expect(ring.guestKeys.get('Bob')).toBeDefined();
+    expect(ring.getGuestKey('Alice')).toBeNull();
+    expect(ring.getGuestKey('Bob')).toBeDefined();
   });
 
   it('get tags and keys', async() => {
@@ -49,9 +49,11 @@ describe('Keyring', () => {
     const restored = await KeyRing.fromBackup('test4', backup);
     const backedUpAgain = await restored.backup();
 
-    expect(originalRing.commKey).toEqual(restored.commKey);
-    expect(originalRing.guestKeys).toEqual(restored.guestKeys);
-    expect(originalRing.hpk).toEqual(restored.hpk);
+    expect(originalRing.getPubCommKey()).toEqual(restored.getPubCommKey());
+    for (let i = 0; i < 10; i++) {
+      expect(originalRing.getGuestKey(`keys${i}`)).toEqual(restored.getGuestKey(`keys${i}`));
+    }
+    expect(originalRing.getHpk()).toEqual(restored.getHpk());
 
     expect(backup).toBe(backedUpAgain);
   });
