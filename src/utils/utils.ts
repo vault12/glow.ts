@@ -5,14 +5,14 @@ export class Utils {
     const isBrowser = typeof btoa !== 'undefined';
     return isBrowser ?
       btoa(this.decode_latin1(input)) :
-      Buffer.from(this.decode_latin1(input), 'utf-8').toString('base64');
+      Buffer.from(this.decode_latin1(input), 'latin1').toString('base64');
   }
 
   static fromBase64(input: Base64): Uint8Array {
     const isBrowser = typeof btoa !== 'undefined';
     return isBrowser ?
       this.encode_latin1(atob(input)) :
-      this.encode_latin1(Buffer.from(input, 'base64').toString('utf-8'));
+      this.encode_latin1(Buffer.from(input, 'base64').toString('latin1'));
   }
 
   static encode_latin1(data: string): Uint8Array {

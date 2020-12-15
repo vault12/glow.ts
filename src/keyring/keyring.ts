@@ -12,7 +12,9 @@ interface KeyRecord {
 }
 
 interface TempKeyTimeout {
-  timeoutId: number;
+  // setTimeout has different return values in Node and browser,
+  // so we extract it right from the environment
+  timeoutId: ReturnType<typeof setTimeout>;
   startTime: number;
 }
 
@@ -188,10 +190,10 @@ export class KeyRing {
   private setKeyTimeout(guestTag: string) {
     const existingTimeout = this.guestKeyTimeouts.get(guestTag);
     if (existingTimeout) {
-      window.clearTimeout(existingTimeout.timeoutId);
+      clearTimeout(existingTimeout.timeoutId);
     }
 
-    const newTimeoutId = window.setTimeout(() => {
+    const newTimeoutId = setTimeout(() => {
       this.guestKeys.delete(guestTag);
       this.guestKeyTimeouts.delete(guestTag);
     }, config.RELAY_SESSION_TIMEOUT);
