@@ -77,13 +77,10 @@ export class KeyRing {
     return null;
   }
 
-  getGuestKey(guestTag: string): Keys | null {
+  getGuestKey(guestTag: string): Base64 | null {
     const keyRecord = this.guestKeys.get(guestTag);
     if (keyRecord) {
-      return new Keys({
-        boxPk: Utils.fromBase64(keyRecord.pk),
-        boxSk: new Uint8Array()
-      });
+      return keyRecord.pk;
     }
     return null;
   }
@@ -157,12 +154,12 @@ export class KeyRing {
     }
   }
 
-  async addGuest(guestTag: string, b64_pk: string): Promise<string> {
-    return await this.processGuest(guestTag, b64_pk);
+  async addGuest(guestTag: string, publicKey: Base64): Promise<string> {
+    return await this.processGuest(guestTag, publicKey);
   }
 
-  async addTempGuest(guestTag: string, b64_pk: string): Promise<string> {
-    return await this.processGuest(guestTag, b64_pk, true);
+  async addTempGuest(guestTag: string, publicKey: Base64): Promise<string> {
+    return await this.processGuest(guestTag, publicKey, true);
   }
 
   async removeGuest(guestTag: string): Promise<boolean> {
@@ -173,10 +170,10 @@ export class KeyRing {
     return true;
   }
 
-  private async processGuest(guestTag: string, b64_pk: string, isTemporary?: boolean): Promise<string> {
-    const b64_h2 = Utils.toBase64(await NaCl.instance().h2(b64_pk));
+  private async processGuest(guestTag: string, publicKey: Base64, isTemporary?: boolean): Promise<string> {
+    const b64_h2 = Utils.toBase64(await NaCl.instance().h2(publicKey));
     this.guestKeys.set(guestTag, {
-      pk: b64_pk,
+      pk: publicKey,
       hpk: b64_h2,
       temp: !!isTemporary
     });
