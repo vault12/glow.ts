@@ -8,7 +8,7 @@ import { Keypair } from '../nacl/keypair.interface';
 export class Keys {
   private keyPair: Keypair;
 
-  constructor(public keys: Base64 | Keypair) {
+  constructor(public keys: string | Keypair) {
     if (typeof keys === 'string') {
       const { boxPk, boxSk } = JSON.parse(keys);
       this.keyPair = {

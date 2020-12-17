@@ -4,6 +4,7 @@ import { Keys } from '../keys/keys';
 import { NaCl } from '../nacl/nacl';
 import { Utils, Base64 } from '../utils/utils';
 import { config } from '../config';
+import { NaClDriver } from '../nacl/nacl-driver.interface';
 
 interface KeyRecord {
   pk: Base64;
@@ -32,12 +33,15 @@ export class KeyRing {
   private hpk?: Uint8Array;
   private guestKeys: Map<string, KeyRecord> = new Map();
   private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
+  private nacl: NaClDriver;
 
-  private constructor() {
+  private constructor(naclDriver: NaClDriver) {
+    this.nacl = naclDriver;
   }
 
   static async new(id: string): Promise<KeyRing> {
-    const keyRing = new KeyRing();
+    const nacl = NaCl.instance();
+    const keyRing = new KeyRing(nacl);
     keyRing.storage = await CryptoStorage.new(new LocalStorageDriver(), id);
     await keyRing.loadCommKey();
     await keyRing.loadGuestKeys();
@@ -46,10 +50,10 @@ export class KeyRing {
 
   static async fromBackup(id: string, backup: string): Promise<KeyRing> {
     const backupObject = JSON.parse(backup);
-    const strCommKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
+    const secretKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
     delete backupObject[config.COMM_KEY_TAG];
     const restoredKeyRing = await KeyRing.new(id);
-    restoredKeyRing.commFromSecKey(strCommKey);
+    restoredKeyRing.setCommFromSecKey(secretKey);
     for (const [key, value] of Object.entries(backupObject)) {
       await restoredKeyRing.addGuest(key, value as string);
     }
@@ -101,11 +105,11 @@ export class KeyRing {
     const commKey = await this.getKey(KeyRing.commKeyTag);
     if (commKey) {
       this.commKey = commKey;
-      this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
+      this.hpk = await this.nacl.h2(this.commKey.publicKey);
     } else {
-      const keypair = await NaCl.instance().crypto_box_keypair();
+      const keypair = await this.nacl.crypto_box_keypair();
       this.commKey = new Keys(keypair);
-      this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
+      this.hpk = await this.nacl.h2(this.commKey.publicKey);
       await this.storage.save(KeyRing.commKeyTag, this.commKey);
     }
   }
@@ -126,21 +130,21 @@ export class KeyRing {
     return JSON.stringify(backupObject);
   }
 
-  async commFromSeed(seed: Uint8Array): Promise<void> {
+  async setCommFromSeed(seed: Uint8Array): Promise<void> {
     if (!this.storage) {
       return;
     }
-    this.commKey = new Keys(await NaCl.instance().crypto_box_keypair_from_seed(seed));
-    this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
+    this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_seed(seed));
+    this.hpk = await this.nacl.h2(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
-  async commFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
+  async setCommFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
     if (!this.storage) {
       return;
     }
-    this.commKey = new Keys(await NaCl.instance().crypto_box_keypair_from_raw_sk(rawSecretKey));
-    this.hpk = await NaCl.instance().h2(this.commKey.publicKey);
+    this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
+    this.hpk = await this.nacl.h2(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
@@ -171,7 +175,7 @@ export class KeyRing {
   }
 
   private async processGuest(guestTag: string, publicKey: Base64, isTemporary?: boolean): Promise<string> {
-    const b64_h2 = Utils.toBase64(await NaCl.instance().h2(publicKey));
+    const b64_h2 = Utils.toBase64(await this.nacl.h2(publicKey));
     this.guestKeys.set(guestTag, {
       pk: publicKey,
       hpk: b64_h2,
