@@ -5,6 +5,9 @@ import { StorageDriver } from './storage-driver.interface';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 
 // TODO: add bulk operations to set(), get() and remove() pairs of values simultaneously
+
+/* CryptoStorage is a handy wrapper around any storage that provides JavaScript interface,
+   that allows to store symmetrically encrypted serializable Javascript objects and primitives. */
 export class CryptoStorage {
   private driver?: StorageDriver;
   private rootKey?: string;
