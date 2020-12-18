@@ -4,12 +4,19 @@ import { LocalStorageDriver } from './local-storage.driver';
 describe('CryptoStorage', () => {
   let storage: CryptoStorage;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     storage = await CryptoStorage.new(new LocalStorageDriver(), 'test');
   });
 
-  it('encrypted write/read', async () => {
+  it('ASCII string write/read', async () => {
     const secretPlaintext = 'The quick brown fox jumps over the lazy dog';
+
+    await storage.save('secretPlaintext', secretPlaintext);
+    const restoredPlaintext = await storage.get('secretPlaintext');
+    expect(secretPlaintext).toBe(restoredPlaintext);
+  });
+
+  it('Complex serialized object write/read', async () => {
     const secretObject = {
       field1: 'string value', // String
       field2: 101, // Number
@@ -20,14 +27,12 @@ describe('CryptoStorage', () => {
       field5: 'Kæmi ný öxi hér ykist þjófum nú bæði víl og ádrepa' // Unicode string in Icelandic
     };
 
-    await storage.save('secretPlaintext', secretPlaintext);
-    const restoredPlaintext = await storage.get('secretPlaintext');
-    expect(secretPlaintext).toBe(restoredPlaintext);
-
     await storage.save('secretObject', secretObject);
     const restoredObject = await storage.get('secretObject');
     expect(JSON.stringify(secretObject)).toBe(JSON.stringify(restoredObject));
+  });
 
+  it('Remove items', async () => {
     await storage.remove('secretPlaintext');
     await storage.remove('secretObject');
 

@@ -149,7 +149,9 @@ export class KeyRing {
 
   private async loadGuestKeys() {
     const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
-    if (Array.isArray(guestKeys)) {
+    if (!guestKeys) {
+      return;
+    } else if (Array.isArray(guestKeys)) {
       this.guestKeys = new Map(guestKeys);
     } else {
       throw new Error('"Guest keys" is not an array');
