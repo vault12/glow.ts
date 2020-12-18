@@ -1,4 +1,5 @@
 import { CryptoStorage } from '../crypto-storage/crypto-storage';
+import { StorageDriver } from '../crypto-storage/storage-driver.interface';
 import { LocalStorageDriver } from '../crypto-storage/local-storage.driver';
 import { Keys } from '../keys/keys';
 import { NaCl } from '../nacl/nacl';
@@ -28,7 +29,7 @@ export class KeyRing {
   static readonly commKeyTag = 'comm_key';
   static readonly guestRegistryTag = 'guest_registry';
 
-  private storage?: CryptoStorage;
+  private cryptoStorage?: CryptoStorage;
   private commKey?: Keys;
   private hpk?: Uint8Array;
   private guestKeys: Map<string, KeyRecord> = new Map();
@@ -39,25 +40,32 @@ export class KeyRing {
     this.nacl = naclDriver;
   }
 
-  static async new(id: string): Promise<KeyRing> {
+  static async new(id: string, storageDriver?: StorageDriver): Promise<KeyRing> {
     const nacl = NaCl.instance();
     const keyRing = new KeyRing(nacl);
-    keyRing.storage = await CryptoStorage.new(new LocalStorageDriver(), id);
+    keyRing.cryptoStorage = await CryptoStorage.new(storageDriver || new LocalStorageDriver(), id);
     await keyRing.loadCommKey();
     await keyRing.loadGuestKeys();
     return keyRing;
   }
 
-  static async fromBackup(id: string, backup: string): Promise<KeyRing> {
+  static async fromBackup(id: string, backup: string, storageDriver?: StorageDriver): Promise<KeyRing> {
     const backupObject = JSON.parse(backup);
     const secretKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
     delete backupObject[config.COMM_KEY_TAG];
-    const restoredKeyRing = await KeyRing.new(id);
+    const restoredKeyRing = await KeyRing.new(id, storageDriver);
     restoredKeyRing.setCommFromSecKey(secretKey);
     for (const [key, value] of Object.entries(backupObject)) {
       await restoredKeyRing.addGuest(key, value as string);
     }
     return restoredKeyRing;
+  }
+
+  get storage(): CryptoStorage {
+    if (!this.cryptoStorage) {
+      throw new Error('No CryptoStorage set');
+    }
+    return this.cryptoStorage;
   }
 
   getNumberOfGuests(): number {
@@ -99,9 +107,6 @@ export class KeyRing {
   }
 
   private async loadCommKey() {
-    if (!this.storage) {
-      return;
-    }
     const commKey = await this.getKey(KeyRing.commKeyTag);
     if (commKey) {
       this.commKey = commKey;
@@ -131,30 +136,23 @@ export class KeyRing {
   }
 
   async setCommFromSeed(seed: Uint8Array): Promise<void> {
-    if (!this.storage) {
-      return;
-    }
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_seed(seed));
     this.hpk = await this.nacl.h2(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
   async setCommFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
-    if (!this.storage) {
-      return;
-    }
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
     this.hpk = await this.nacl.h2(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
   private async loadGuestKeys() {
-    if (!this.storage) {
-      return;
-    }
     const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
     if (Array.isArray(guestKeys)) {
       this.guestKeys = new Map(guestKeys);
+    } else {
+      throw new Error('"Guest keys" is not an array');
     }
   }
 
@@ -206,16 +204,10 @@ export class KeyRing {
   }
 
   private async saveGuests() {
-    if (!this.storage) {
-      return;
-    }
     await this.storage.save(KeyRing.guestRegistryTag, Array.from(this.guestKeys.entries()));
   }
 
   private async getKey(tag: string) {
-    if (!this.storage) {
-      return;
-    }
     const key = await this.storage.get(tag);
     if (typeof key === 'string') {
       return new Keys(key);
