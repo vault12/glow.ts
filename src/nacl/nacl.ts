@@ -9,7 +9,9 @@ export class NaCl {
   private static driverInstance?: NaClDriver;
 
   public static setInstance(driver?: NaClDriver): boolean {
-    if (!this.driverInstance) {
+    if (this.driverInstance) {
+      throw new Error('NaCl driver has been already set, it is supposed to be set only once');
+    } else {
       // fallback to the default JS driver
       this.driverInstance = driver || new JsNaClDriver();
     }
