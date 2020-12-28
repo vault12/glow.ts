@@ -8,6 +8,7 @@ const config: Config.InitialOptions = {
       statements: 90,
     },
   },
+  setupFiles: ['jest-localstorage-mock'],
   preset: 'ts-jest',
   testEnvironment: 'jsdom', // TODO: run tests through both 'node' and 'jsdom'
   verbose: true

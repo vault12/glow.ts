@@ -17,6 +17,10 @@
     "@typescript-eslint"
   ],
   "rules": {
+    "@typescript-eslint/no-empty-function": [
+      "error",
+      { "allow" : ["constructors"] }
+    ],
     "indent": [
       "error",
       2
