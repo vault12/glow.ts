@@ -14,16 +14,16 @@ export class CryptoStorage {
   private storageKey?: Uint8Array;
   private nacl: NaClDriver;
 
-  private constructor(naclDriver: NaClDriver) {
-    this.nacl = naclDriver;
+  private constructor(storageDriver: StorageDriver, rootKey?: string) {
+    const nacl = NaCl.instance();
+    this.nacl = nacl;
+    this.driver = storageDriver;
+    this.rootKey = rootKey ? `.${rootKey}${config.STORAGE_ROOT}` : config.STORAGE_ROOT;
   }
 
   static async new(storageDriver: StorageDriver, rootKey?: string): Promise<CryptoStorage> {
-    const nacl = NaCl.instance();
-    const storage = new CryptoStorage(nacl);
-    storage.driver = storageDriver;
-    storage.storageKey = await nacl.random_bytes(nacl.crypto_secretbox_KEYBYTES);
-    storage.rootKey = rootKey ? `.${rootKey}${config.STORAGE_ROOT}` : config.STORAGE_ROOT;
+    const storage = new CryptoStorage(storageDriver, rootKey);
+    storage.storageKey = await storage.nacl.random_bytes(storage.nacl.crypto_secretbox_KEYBYTES);
     return storage;
   }
 

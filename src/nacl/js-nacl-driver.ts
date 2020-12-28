@@ -102,8 +102,9 @@ export class JsNaClDriver implements NaClDriver {
   async to_hex(data: Uint8Array): Promise<string> {
     const encoded = [];
     for (let i = 0; i < data.length; i++) {
-      encoded.push('0123456789abcdef'[(data[i] >> 4) & 15]);
-      encoded.push('0123456789abcdef'[data[i] & 15]);
+      const hexAlphabet = '0123456789abcdef';
+      encoded.push(hexAlphabet[(data[i] >> 4) & 15]);
+      encoded.push(hexAlphabet[data[i] & 15]);
     }
     return encoded.join('');
   }
