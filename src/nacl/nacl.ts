@@ -8,13 +8,18 @@ import { JsNaClDriver } from './js-nacl-driver';
 export class NaCl {
   private static driverInstance?: NaClDriver;
 
-  private constructor() {
-  }
-
-  public static instance(driver?: NaClDriver): NaClDriver {
+  public static setInstance(driver?: NaClDriver): boolean {
     if (!this.driverInstance) {
       // fallback to the default JS driver
       this.driverInstance = driver || new JsNaClDriver();
+    }
+
+    return true;
+  }
+
+  public static getInstance(): NaClDriver {
+    if (!this.driverInstance) {
+      throw new Error('NaCl instance is not yet set');
     }
 
     return this.driverInstance;

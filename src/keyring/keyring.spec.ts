@@ -1,15 +1,23 @@
 import { KeyRing } from './keyring';
 import { NaCl } from '../nacl/nacl';
+import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { Keys } from '../keys/keys';
 import { config } from '../config';
 import { Utils } from '../utils/utils';
 
 describe('Keyring', () => {
+  let nacl: NaClDriver;
+
+  beforeAll(() => {
+    NaCl.setInstance();
+    nacl = NaCl.getInstance();
+  });
+
   it('add/remove guests', async () => {
     const ring = await KeyRing.new('test1');
 
-    const keys1 = new Keys(await NaCl.instance().crypto_box_keypair());
-    const keys2 = new Keys(await NaCl.instance().crypto_box_keypair());
+    const keys1 = new Keys(await nacl.crypto_box_keypair());
+    const keys2 = new Keys(await nacl.crypto_box_keypair());
 
     await ring.addGuest('Alice', keys1.publicKey);
     expect(ring.getNumberOfGuests()).toBe(1);
@@ -30,9 +38,9 @@ describe('Keyring', () => {
     const commKey = ring.getPubCommKey();
     expect(typeof commKey).toBe('string');
 
-    const aliceKey = new Keys(await NaCl.instance().crypto_box_keypair());
+    const aliceKey = new Keys(await nacl.crypto_box_keypair());
     await ring.addGuest('Alice', aliceKey.publicKey);
-    const hpk = Utils.toBase64(await NaCl.instance().h2(aliceKey.publicKey));
+    const hpk = Utils.toBase64(await nacl.h2(aliceKey.publicKey));
     expect(ring.getTagByHpk(hpk)).not.toBeNull();
     expect(ring.getTagByHpk('Bob')).toBeNull();
   });
@@ -40,7 +48,7 @@ describe('Keyring', () => {
   it('backup and restore', async () => {
     const originalRing = await KeyRing.new('test3');
     for (let i = 0; i < 10; i++) {
-      const keys = new Keys(await NaCl.instance().crypto_box_keypair());
+      const keys = new Keys(await nacl.crypto_box_keypair());
       await originalRing.addGuest(`keys${i}`, keys.publicKey);
     }
 
@@ -63,7 +71,7 @@ describe('Keyring', () => {
     // mock config value
     config.RELAY_SESSION_TIMEOUT = 100;
     const ring = await KeyRing.new('test5');
-    const keys = new Keys(await NaCl.instance().crypto_box_keypair());
+    const keys = new Keys(await nacl.crypto_box_keypair());
     await ring.addTempGuest('temp', keys.publicKey);
     // the key has to exist before we run the timer
     expect(ring.getGuestKey('temp')).not.toBeNull();

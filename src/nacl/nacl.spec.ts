@@ -5,8 +5,9 @@ import { Utils } from '../utils/utils';
 describe('NaCl', () => {
   let nacl: NaClDriver;
 
-  beforeEach(() => {
-    nacl = NaCl.instance();
+  beforeAll(() => {
+    NaCl.setInstance();
+    nacl = NaCl.getInstance();
   });
 
   it('crypto_secretbox', async () => {

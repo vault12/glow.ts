@@ -15,7 +15,7 @@ export class CryptoStorage {
   private nacl: NaClDriver;
 
   private constructor(storageDriver: StorageDriver, rootKey?: string) {
-    const nacl = NaCl.instance();
+    const nacl = NaCl.getInstance();
     this.nacl = nacl;
     this.driver = storageDriver;
     this.rootKey = rootKey ? `.${rootKey}${config.STORAGE_ROOT}` : config.STORAGE_ROOT;

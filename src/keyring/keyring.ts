@@ -41,7 +41,7 @@ export class KeyRing {
   }
 
   static async new(id: string, storageDriver?: StorageDriver): Promise<KeyRing> {
-    const nacl = NaCl.instance();
+    const nacl = NaCl.getInstance();
     const keyRing = new KeyRing(nacl);
     keyRing.cryptoStorage = await CryptoStorage.new(storageDriver || new LocalStorageDriver(), id);
     await keyRing.loadCommKey();
