@@ -27,7 +27,7 @@ export class Relay {
     this.nacl = NaCl.getInstance();
   }
 
-  async openConnection() {
+  async openConnection(): Promise<void> {
     // exchange tokens with a relay and get a temp session key for this relay
     await this.getServerToken();
     await this.getServerKey();
@@ -63,7 +63,7 @@ export class Relay {
 
   async getServerKey() {
     if (!this.clientToken || !this.relayToken) {
-      throw new Error(`No token`);
+      throw new Error('No token');
     }
     const clientTokenString = Utils.decode_latin1(this.clientToken);
     // After clientToken is sent to the relay, we use only h2() of it
@@ -87,7 +87,7 @@ export class Relay {
     return `relay_#${this.url}`;
   }
 
-  runCmd(command: string, mailbox: any, params?: object) {
+  runCmd(command: string, mailbox: any, params?: any) {
     if (!Relay.relayCommands.includes(command)) {
       throw new Error(`Relay ${this.url} doesn't support command ${command}`);
     }
@@ -98,8 +98,8 @@ export class Relay {
       if (!response) {
         throw new Error(`${this.url} - ${command} error; empty response`);
       }
-      this.processResponse(response, mailbox, command, params);
-    })
+      // this.processResponse(response, mailbox, command, params);
+    });
   }
 
   private async ensureNonceDiff(handshake: Uint8Array) {
@@ -111,7 +111,7 @@ export class Relay {
     } while(!this.arrayZeroBits(h2, this.diff));
 
     return nonce;
-  };
+  }
 
   private async httpRequest(type: string, ...params: any[]) {
     let request;
@@ -156,15 +156,15 @@ export class Relay {
     return response;
   }
 
-  private processResponse(rawResponse: string, mailbox: any, command: string, params: any) {
-  }
+  // private processResponse(rawResponse: string, mailbox: any, command: string, params: any) {
+  // }
 
   private firstZeroBits(byte: any, n: any) {
     return byte === ((byte >> n) << n);
   }
 
   private arrayZeroBits(arr: any, diff: any) {
-    var a, i, j, ref, rmd;
+    let a, i, j, ref, rmd;
     rmd = diff;
     for (i = j = 0, ref = 1 + diff / 8; (0 <= ref ? j <= ref : j >= ref); i = 0 <= ref ? ++j : --j) {
       a = arr[i];
