@@ -31,7 +31,7 @@ export class KeyRing {
 
   private cryptoStorage?: CryptoStorage;
   private commKey?: Keys;
-  private hpk?: Uint8Array;
+  public hpk?: Uint8Array;
   private guestKeys: Map<string, KeyRecord> = new Map();
   private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
   private nacl: NaClDriver;

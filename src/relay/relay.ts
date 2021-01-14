@@ -4,6 +4,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Utils } from '../utils/utils';
+import { Mailbox } from '../mailbox/mailbox';
 
 /**
  * Low-level operations with Zax relay.
@@ -100,6 +101,10 @@ export class Relay {
       }
       // this.processResponse(response, mailbox, command, params);
     });
+  }
+
+  async connectMailbox(mbx: Mailbox) {
+    const key = await mbx.createSessionKey(this.relayId(), true);
   }
 
   private async ensureNonceDiff(handshake: Uint8Array) {
