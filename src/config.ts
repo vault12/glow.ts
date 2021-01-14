@@ -12,5 +12,8 @@ export const config = {
   RELAY_TOKEN_TIMEOUT: 5 * 60 * 1000,
 
   // 15 min - Matched with config.x.relay.session_timeout
-  RELAY_SESSION_TIMEOUT: 15 * 60 * 1000
+  RELAY_SESSION_TIMEOUT: 15 * 60 * 1000,
+
+  // 5 sec - Ajax request timeout
+  RELAY_AJAX_TIMEOUT: 5 * 1000
 };
