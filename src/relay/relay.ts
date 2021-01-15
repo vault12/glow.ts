@@ -5,6 +5,7 @@ import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Utils } from '../utils/utils';
 import { Mailbox } from '../mailbox/mailbox';
+import { Keys } from '../keys/keys';
 
 /**
  * Low-level operations with Zax relay.
@@ -23,6 +24,7 @@ export class Relay {
   private clientToken?: Uint8Array;
   private relayToken?: Uint8Array;
   private diff?: number;
+  private relayPublicKey?: string;
 
   constructor(public url: string) {
     this.nacl = NaCl.getInstance();
@@ -82,6 +84,7 @@ export class Relay {
     // relay gives us back temp session key masked by clientToken we started with
     const relayPk = await this.httpRequest('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     console.log(relayPk);
+    this.relayPublicKey = relayPk;
   }
 
   relayId() {
@@ -105,6 +108,8 @@ export class Relay {
 
   async connectMailbox(mbx: Mailbox) {
     const key = await mbx.createSessionKey(this.relayId(), true);
+    await this.httpRequest('prove', mbx, key?.publicKey);
+    return this.relayId();
   }
 
   private async ensureNonceDiff(handshake: Uint8Array) {
@@ -127,6 +132,14 @@ export class Relay {
       case 'verify_session':
         request = await this.httpCall('verify_session', params[0], params[1]);
         break;
+      case 'prove':
+        if (!this.relayPublicKey) {
+          throw new Error('No relay public key');
+        }
+        const mbx: Mailbox = params[0];
+        const clientTempPk = params[1];
+        mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
+        delete this.relayPublicKey;
       default:
         throw new Error(`Unknown request type: ${type}`);
     }

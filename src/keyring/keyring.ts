@@ -30,7 +30,7 @@ export class KeyRing {
   static readonly guestRegistryTag = 'guest_registry';
 
   private cryptoStorage?: CryptoStorage;
-  private commKey?: Keys;
+  public commKey?: Keys;
   public hpk?: Uint8Array;
   private guestKeys: Map<string, KeyRecord> = new Map();
   private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
