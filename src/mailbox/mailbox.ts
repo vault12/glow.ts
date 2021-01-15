@@ -54,7 +54,7 @@ export class Mailbox {
   // added to our keyring. If the session flag is set, we will look for keys in
   // temporary, not the persistent collection of session keys. skTag lets you
   // specifiy the secret key in a key ring
-  async encodeMessage(guest: string, message: Uint8Array, session = false, skTag = null) {
+  async encodeMessage(guest: string, message: any, session = false, skTag = null) {
     const guestPk = this.keyRing?.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`encodeMessage: don't know guest ${guest}`);
@@ -62,7 +62,11 @@ export class Mailbox {
 
     const privateKey = this.keyRing?.commKey?.privateKey;
     if (!privateKey) {
-      throw new Error(`encodeMessage: no comm key`);
+      throw new Error('encodeMessage: no comm key');
+    }
+
+    if (!(message instanceof Uint8Array)) {
+      message = await this.nacl.encode_utf8(JSON.stringify(message));
     }
 
     // TODO: add whatever neccesary int32 id/counter logic and provide nonceData as last param
@@ -84,13 +88,18 @@ export class Mailbox {
 
     const privateKey = this.keyRing?.commKey?.privateKey;
     if (!privateKey) {
-      throw new Error(`decodeMessage: no comm key`);
+      throw new Error('decodeMessage: no comm key');
     }
     return await this.rawDecodeMessage(nonce, ctext, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array) {
     const data = await this.nacl.crypto_box_open(ctext, nonce, pkFrom, skTo);
+    if (data) {
+      const utf8 = await this.nacl.decode_utf8(data);
+      return JSON.parse(utf8);
+    }
+
     return data;
   }
 

@@ -4,8 +4,6 @@ import { NaCl } from '../nacl/nacl';
 describe('Mailbox', () => {
   let Alice: Mailbox;
   let Bob: Mailbox;
-  let message1: any;
-  let message2: any;
 
   beforeAll(async () => {
     NaCl.setInstance();
@@ -31,15 +29,22 @@ describe('Mailbox', () => {
     expect(Bob.keyRing.getGuestKey('Alice_mbx')).not.toBeNull();
   });
 
-  it('encrypt message', async () => {
-    message1 = await Alice.encodeMessage('Bob_mbx', new Uint8Array([1, 2, 3, 4]));
-    message2 = await Bob.encodeMessage('Alice_mbx', new Uint8Array([5, 6, 7, 8]));
-  });
+  it('encrypts & decrypts strings between mailboxes', async () => {
+    const utfSource1 = 'Bob, I heard from Наталья Дубровская we have a problem with the water chip.';
+    const utfSource2 = 'Alice, I will dispatch one of the youngsters to find a replacement outside. नमस्ते!';
 
-  it('decrypt message', async () => {
+    const message1 = await Alice.encodeMessage('Bob_mbx', utfSource1);
+    const message2 = await Bob.encodeMessage('Alice_mbx', utfSource2);
+
     const decoded1 = await Bob.decodeMessage('Alice_mbx', message1.nonce, message1.ctext);
     const decoded2 = await Alice.decodeMessage('Bob_mbx', message2.nonce, message2.ctext);
-    console.log(decoded1);
-    console.log(decoded2);
+    expect(decoded1).toEqual(utfSource1);
+    expect(decoded2).toEqual(utfSource2);
+  });
+
+  it('encrypts raw binary data', async () => {
+    const message = await Alice.encodeMessage('Bob_mbx', new Uint8Array([1, 2, 3, 4]));
+    expect(message.nonce).toHaveLength(24);
+    expect(message.ctext).toHaveLength(20);
   });
 });

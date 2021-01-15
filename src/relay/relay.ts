@@ -83,7 +83,6 @@ export class Relay {
 
     // relay gives us back temp session key masked by clientToken we started with
     const relayPk = await this.httpRequest('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
-    console.log(relayPk);
     this.relayPublicKey = relayPk;
   }
 
@@ -140,6 +139,7 @@ export class Relay {
         const clientTempPk = params[1];
         mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
         delete this.relayPublicKey;
+        break;
       default:
         throw new Error(`Unknown request type: ${type}`);
     }
