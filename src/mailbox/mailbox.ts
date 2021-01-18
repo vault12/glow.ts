@@ -17,13 +17,35 @@ export class Mailbox {
     this.nacl = naclDriver;
   }
 
-  static async new(identity: string): Promise<Mailbox> {
+  static async new(id: string, backup?: string): Promise<Mailbox> {
     const nacl = NaCl.getInstance();
     const mbx = new Mailbox(nacl);
-    mbx.identity = identity;
-    const keyRing = await KeyRing.new(identity);
-    mbx.keyRing = keyRing;
+    mbx.identity = id;
+    if (backup) {
+      mbx.keyRing = await KeyRing.fromBackup(id, backup);
+    } else {
+      mbx.keyRing = await KeyRing.new(id);
+    }
     return mbx;
+  }
+
+  // You can create a Mailbox where the secret identity key is derived from a well-known seed
+  static async fromSeed(id: string, seed: Uint8Array): Promise<Mailbox> {
+    const mbx = await this.new(id);
+    await mbx.keyRing?.setCommFromSeed(seed);
+    return mbx;
+  }
+
+  // You can also create a Mailbox if you already know the secret identity key
+  static async fromSecKey(id: string, rawSecretKey: Uint8Array): Promise<Mailbox> {
+    const mbx = await this.new(id);
+    await mbx.keyRing?.setCommFromSecKey(rawSecretKey);
+    return mbx;
+  }
+
+  // You can also create a Mailbox from backup string
+  static async fromBackup(id: string, backup: string): Promise<Mailbox> {
+    return await this.new(id, backup);
   }
 
   // This is the HPK (hash of the public key) of your mailbox. This is what Zax relays

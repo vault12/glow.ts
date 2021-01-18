@@ -1,5 +1,6 @@
 import { Mailbox } from './mailbox';
 import { NaCl } from '../nacl/nacl';
+import { Utils } from '../utils/utils';
 
 describe('Mailbox', () => {
   let Alice: Mailbox;
@@ -27,6 +28,38 @@ describe('Mailbox', () => {
     await Bob.keyRing.addGuest('Alice_mbx', Alice.getPubCommKey() || '');
     expect(Bob.keyRing.getNumberOfGuests()).toBe(1);
     expect(Bob.keyRing.getGuestKey('Alice_mbx')).not.toBeNull();
+  });
+
+  it('Mailbox from a well known seed', async () => {
+    const mbx = await Mailbox.fromSeed('from_seed', Utils.encode_latin1('hello'));
+    expect(mbx.keyRing?.getPubCommKey()).toBe('2DM+z1PaxGXVnzsDh4zv+IlH7sV8llEFoEmg9fG3pRA=');
+    expect(mbx.keyRing?.hpk).toEqual(
+      new Uint8Array([249, 209, 90, 99, 252, 44, 187, 27, 13, 101, 229, 199, 235, 31, 235, 119, 224, 25,
+        207, 215, 94, 130, 71, 230, 44, 22, 217, 0, 201, 41, 61, 222]));
+  });
+
+  it.only('Mailbox backup & restore', async () => {
+    const pubCommKey = 'vye4sj8BKHopBVXUfv3s3iKyP6TyNoJnHUYWCMcjwTo=';
+    const hpk = new Uint8Array([36, 36, 36, 231, 132, 114, 39, 6, 230, 153, 228, 128, 132,
+      215, 100, 241, 87, 187, 9, 53, 179, 248, 176, 242, 249, 101, 68, 48, 48, 9, 219, 211]);
+
+    const mbx = await Mailbox.fromSeed('from_seed2', Utils.encode_latin1('hello2'));
+    if (!mbx.keyRing) {
+      throw new Error('no keyRing');
+    }
+
+    expect(mbx.keyRing.getPubCommKey()).toBe(pubCommKey);
+    expect(mbx.keyRing.hpk).toEqual(hpk);
+
+    const backup = await mbx.keyRing.backup();
+
+    const restoredMbx = await Mailbox.fromBackup('from_backup', backup);
+    if (!restoredMbx.keyRing) {
+      throw new Error('no keyRing');
+    }
+
+    expect(restoredMbx.keyRing.getPubCommKey()).toBe(pubCommKey);
+    expect(restoredMbx.keyRing.hpk).toEqual(hpk);
   });
 
   it('encrypts & decrypts strings between mailboxes', async () => {

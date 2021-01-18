@@ -54,7 +54,7 @@ export class KeyRing {
     const secretKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
     delete backupObject[config.COMM_KEY_TAG];
     const restoredKeyRing = await KeyRing.new(id, storageDriver);
-    restoredKeyRing.setCommFromSecKey(secretKey);
+    await restoredKeyRing.setCommFromSecKey(secretKey);
     for (const [key, value] of Object.entries(backupObject)) {
       await restoredKeyRing.addGuest(key, value as string);
     }
@@ -110,11 +110,11 @@ export class KeyRing {
     const commKey = await this.getKey(KeyRing.commKeyTag);
     if (commKey) {
       this.commKey = commKey;
-      this.hpk = await this.nacl.h2(this.commKey.publicKey);
+      await this.setHpk(this.commKey.publicKey);
     } else {
       const keypair = await this.nacl.crypto_box_keypair();
       this.commKey = new Keys(keypair);
-      this.hpk = await this.nacl.h2(this.commKey.publicKey);
+      await this.setHpk(this.commKey.publicKey);
       await this.storage.save(KeyRing.commKeyTag, this.commKey);
     }
   }
@@ -137,13 +137,13 @@ export class KeyRing {
 
   async setCommFromSeed(seed: Uint8Array): Promise<void> {
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_seed(seed));
-    this.hpk = await this.nacl.h2(this.commKey.publicKey);
+    await this.setHpk(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
   async setCommFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
-    this.hpk = await this.nacl.h2(this.commKey.publicKey);
+    await this.setHpk(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
@@ -175,7 +175,7 @@ export class KeyRing {
   }
 
   private async processGuest(guestTag: string, publicKey: Base64, isTemporary?: boolean): Promise<string> {
-    const b64_h2 = Utils.toBase64(await this.nacl.h2(publicKey));
+    const b64_h2 = Utils.toBase64(await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(publicKey))));
     this.guestKeys.set(guestTag, {
       pk: publicKey,
       hpk: b64_h2,
@@ -216,5 +216,9 @@ export class KeyRing {
     } else {
       return null;
     }
+  }
+
+  private async setHpk(publicKey: Base64) {
+    this.hpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(publicKey)));
   }
 }
