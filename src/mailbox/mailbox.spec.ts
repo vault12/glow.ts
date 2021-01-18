@@ -38,7 +38,7 @@ describe('Mailbox', () => {
         207, 215, 94, 130, 71, 230, 44, 22, 217, 0, 201, 41, 61, 222]));
   });
 
-  it.only('Mailbox backup & restore', async () => {
+  it('Mailbox backup & restore', async () => {
     const pubCommKey = 'vye4sj8BKHopBVXUfv3s3iKyP6TyNoJnHUYWCMcjwTo=';
     const hpk = new Uint8Array([36, 36, 36, 231, 132, 114, 39, 6, 230, 153, 228, 128, 132,
       215, 100, 241, 87, 187, 9, 53, 179, 248, 176, 242, 249, 101, 68, 48, 48, 9, 219, 211]);

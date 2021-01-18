@@ -2,6 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Utils } from '../utils/utils';
+import { Relay } from '../relay/relay';
 import { Keys } from '../keys/keys';
 
 /**
@@ -82,7 +83,15 @@ export class Mailbox {
       throw new Error(`encodeMessage: don't know guest ${guest}`);
     }
 
-    const privateKey = this.keyRing?.commKey?.privateKey;
+    let privateKey;
+    privateKey = this.keyRing?.commKey?.privateKey;
+    if (!privateKey) {
+      throw new Error('encodeMessage: no comm key');
+    }
+
+    if (session) {
+      privateKey = this.sessionKeys.get(guest)?.privateKey;
+    }
     if (!privateKey) {
       throw new Error('encodeMessage: no comm key');
     }
@@ -125,11 +134,27 @@ export class Mailbox {
     return data;
   }
 
+  async connectToRelay(relay: Relay) {
+    await relay.openConnection();
+    await relay.connectMailbox(this);
+  }
+
+  async relaySend(guest: string, message: any, relay: Relay) {
+    const guestPk = this.keyRing?.getGuestKey(guest);
+    if (!guestPk) {
+      throw new Error(`decodeMessage: don't know guest ${guest}`);
+    }
+
+    const encodedMessage = await this.encodeMessage(guest, message);
+    const h2 = await this.nacl.h2(guestPk);
+    await relay.upload(this, h2, encodedMessage);
+  }
+
   // Makes a timestamp nonce that a relay expects for any crypto operations.
   // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
   // is specified. 'data' will be packed as next 4 bytes after timestamp
   // Returns a Promise
-  public async makeNonce(data: any = null, time = Date.now()) {
+  private async makeNonce(data: any = null, time = Date.now()) {
     const nonce = await this.nacl.crypto_box_random_nonce();
     let aData, aTime, headerLen, i, j, k, l, ref, ref1, ref2;
     if (!((nonce != null) && nonce.length === 24)) {

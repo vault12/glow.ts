@@ -111,6 +111,16 @@ export class Relay {
     return this.relayId();
   }
 
+  async upload(mailbox: Mailbox, toHpk: Uint8Array, payload: any) {
+    this.runCmd('upload', mailbox, {
+      to: Utils.toBase64(toHpk),
+      payload: {
+        nonce: Utils.toBase64(payload.nonce),
+        ctext: Utils.toBase64(payload.ctext),
+      }
+    });
+  }
+
   private async ensureNonceDiff(handshake: Uint8Array) {
     let nonce;
     let h2;
@@ -124,6 +134,7 @@ export class Relay {
 
   private async httpRequest(type: string, ...params: any[]) {
     let request;
+    let mbx: Mailbox;
     switch (type) {
       case 'start_session':
         request = await this.httpCall('start_session', params[0]);
@@ -135,10 +146,42 @@ export class Relay {
         if (!this.relayPublicKey) {
           throw new Error('No relay public key');
         }
-        const mbx: Mailbox = params[0];
-        const clientTempPk = params[1];
-        mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
+        mbx = params[0];
+        const clientTempPk = Utils.fromBase64(params[1]);
+
+        await mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
         delete this.relayPublicKey;
+        if (!this.clientToken || !this.relayToken) {
+          throw new Error('No token');
+        }
+
+        //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
+        const signature = new Uint8Array([...clientTempPk, ...this.relayToken, ...this.clientToken]);
+
+        const h2Signature = await this.nacl.h2(Utils.decode_latin1(signature));
+        const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
+        const payload = {
+          pub_key: mbx.keyRing?.getPubCommKey(),
+          nonce: Utils.toBase64(inner.nonce),
+          ctext: Utils.toBase64(inner.ctext)
+        };
+
+        const outer = await mbx.encodeMessage(this.relayId(), payload, true);
+        const clientTokenString = Utils.decode_latin1(this.clientToken);
+        const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
+
+        await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
+          Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
+        break;
+      case 'command':
+        mbx = params[0];
+        const mbxHpk = mbx.getHpk();
+        if (!mbxHpk) {
+          throw new Error('No hpk');
+        }
+        const message = await mbx.encodeMessage(this.relayId(), params[1], true);
+        request = await this.httpCall('command', mbxHpk,
+          Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
         break;
       default:
         throw new Error(`Unknown request type: ${type}`);
