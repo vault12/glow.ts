@@ -117,10 +117,18 @@ export class Mailbox {
       throw new Error(`decodeMessage: don't know guest ${guest}`);
     }
 
-    const privateKey = this.keyRing?.commKey?.privateKey;
+    let privateKey = this.keyRing?.commKey?.privateKey;
     if (!privateKey) {
       throw new Error('decodeMessage: no comm key');
     }
+
+    if (session) {
+      privateKey = this.sessionKeys.get(guest)?.privateKey;
+    }
+    if (!privateKey) {
+      throw new Error('decodeMessage: no comm key');
+    }
+
     return await this.rawDecodeMessage(nonce, ctext, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
@@ -147,7 +155,7 @@ export class Mailbox {
 
     const encodedMessage = await this.encodeMessage(guest, message);
     const h2 = await this.nacl.h2(guestPk);
-    await relay.upload(this, h2, encodedMessage);
+    return await relay.upload(this, h2, encodedMessage);
   }
 
   // Makes a timestamp nonce that a relay expects for any crypto operations.

@@ -23,6 +23,16 @@ describe('Relay', () => {
 
   it('should init', async () => {
     await Alice.connectToRelay(testRelay);
-    await Alice.relaySend('Bob', 'message', testRelay);
+    const token = await Alice.relaySend('Bob', 'message', testRelay);
+    expect(token.length).toBeGreaterThan(0);
+    const ttl = await testRelay.messageStatus(Alice, token);
+    expect(ttl).toBeGreaterThan(0);
+  });
+
+  it('count Bob mailbox', async () => {
+    const r = new Relay('https://z2.vault12.com');
+    await Bob.connectToRelay(r);
+    const count = await r.count(Bob);
+    console.log(count);
   });
 });

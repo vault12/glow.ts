@@ -90,19 +90,19 @@ export class Relay {
     return `relay_#${this.url}`;
   }
 
-  runCmd(command: string, mailbox: any, params?: any) {
+  async runCmd(command: string, mailbox: Mailbox, params?: any) {
     if (!Relay.relayCommands.includes(command)) {
       throw new Error(`Relay ${this.url} doesn't support command ${command}`);
     }
 
     const data = { cmd: command, ...params };
 
-    return this.httpRequest('command', mailbox, data).then(response => {
-      if (!response) {
-        throw new Error(`${this.url} - ${command} error; empty response`);
-      }
-      // this.processResponse(response, mailbox, command, params);
-    });
+    const response = await this.httpRequest('command', mailbox, data);
+    if (!response) {
+      throw new Error(`${this.url} - ${command} error; empty response`);
+    }
+
+    return await this.processResponse(response, mailbox, command, params);
   }
 
   async connectMailbox(mbx: Mailbox) {
@@ -112,13 +112,25 @@ export class Relay {
   }
 
   async upload(mailbox: Mailbox, toHpk: Uint8Array, payload: any) {
-    this.runCmd('upload', mailbox, {
+    return await this.runCmd('upload', mailbox, {
       to: Utils.toBase64(toHpk),
       payload: {
         nonce: Utils.toBase64(payload.nonce),
         ctext: Utils.toBase64(payload.ctext),
       }
     });
+  }
+
+  async count(mailbox: Mailbox) {
+    return await this.runCmd('count', mailbox);
+  }
+
+  async download(mailbox: Mailbox) {
+    return await this.runCmd('download', mailbox);
+  }
+
+  async messageStatus(mailbox: Mailbox, storageToken: any) {
+    return await this.runCmd('messageStatus', mailbox, { token: storageToken });
   }
 
   private async ensureNonceDiff(handshake: Uint8Array) {
@@ -217,8 +229,33 @@ export class Relay {
     return response;
   }
 
-  // private processResponse(rawResponse: string, mailbox: any, command: string, params: any) {
-  // }
+  private async processResponse(rawResponse: string, mailbox: Mailbox, command: string, params: any) {
+    const response = this.processData(String(rawResponse));
+
+    if (command === 'upload') {
+      if (response.length !== 1 || response[0].length !== config.RELAY_TOKEN_B64) {
+        throw new Error(`${this.url} - ${command}: Bad response`);
+      }
+      return rawResponse;
+    }
+
+    if (command === 'messageStatus') {
+      if (response.length !== 1) {
+        throw new Error(`${this.url} - ${command}: Bad response`);
+      }
+      return parseInt(response[0], 10);
+    }
+
+    if (response.length !== 2) {
+      throw new Error(`${this.url} - ${command}: Bad response`);
+    }
+
+    const nonce = response[0];
+    const ctext = response[1];
+    const decoded = await mailbox.decodeMessage(this.relayId(),
+      Utils.fromBase64(nonce), Utils.fromBase64(ctext), true);
+    return decoded;
+  }
 
   private firstZeroBits(byte: any, n: any) {
     return byte === ((byte >> n) << n);
