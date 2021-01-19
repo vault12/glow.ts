@@ -129,6 +129,10 @@ export class Relay {
     return await this.runCmd('download', mailbox);
   }
 
+  async delete(mailbox: Mailbox, nonceList: string[]) {
+    return await this.runCmd('delete', mailbox, { payload: nonceList });
+  }
+
   async messageStatus(mailbox: Mailbox, storageToken: any) {
     return await this.runCmd('messageStatus', mailbox, { token: storageToken });
   }
@@ -231,6 +235,10 @@ export class Relay {
 
   private async processResponse(rawResponse: string, mailbox: Mailbox, command: string, params: any) {
     const response = this.processData(String(rawResponse));
+
+    if (command === 'delete') {
+      return JSON.parse(rawResponse);
+    }
 
     if (command === 'upload') {
       if (response.length !== 1 || response[0].length !== config.RELAY_TOKEN_B64) {

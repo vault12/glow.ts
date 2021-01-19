@@ -21,7 +21,7 @@ describe('Relay', () => {
     await Bob.keyRing?.addGuest('Alice', aliceKey);
   });
 
-  it('should init', async () => {
+  it('send a message', async () => {
     await Alice.connectToRelay(testRelay);
     const token = await Alice.relaySend('Bob', 'message', testRelay);
     expect(token.length).toBeGreaterThan(0);
@@ -30,9 +30,22 @@ describe('Relay', () => {
   });
 
   it('count Bob mailbox', async () => {
-    const r = new Relay('https://z2.vault12.com');
-    await Bob.connectToRelay(r);
-    const count = await r.count(Bob);
+    await Bob.connectToRelay(testRelay);
+    const count = await testRelay.count(Bob);
     expect(count).toBe(1);
+  });
+
+  it('download Bob mailbox', async () => {
+    await Bob.connectToRelay(testRelay);
+    const downloaded = await testRelay.download(Bob);
+    const encodedMessage = downloaded[0];
+    const msg = await Bob.decodeMessage('Alice', encodedMessage.nonce, encodedMessage.data);
+    expect(msg).toBe('message');
+  });
+
+  it('delete from Bob mailbox', async () => {
+    await testRelay.delete(Bob, []);
+    const count = await testRelay.count(Bob);
+    console.log(count);
   });
 });

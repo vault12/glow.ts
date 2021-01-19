@@ -1,7 +1,7 @@
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
-import { Utils } from '../utils/utils';
+import { Base64, Utils } from '../utils/utils';
 import { Relay } from '../relay/relay';
 import { Keys } from '../keys/keys';
 
@@ -111,7 +111,8 @@ export class Mailbox {
     return { nonce, ctext };
   }
 
-  async decodeMessage(guest: string, nonce: Uint8Array, ctext: Uint8Array, session = false, skTag = null) {
+  async decodeMessage(guest: string, nonce: Uint8Array | Base64, ctext: Uint8Array | Base64,
+    session = false, skTag = null) {
     const guestPk = this.keyRing?.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`decodeMessage: don't know guest ${guest}`);
@@ -127,6 +128,14 @@ export class Mailbox {
     }
     if (!privateKey) {
       throw new Error('decodeMessage: no comm key');
+    }
+
+    if (!(nonce instanceof Uint8Array)) {
+      nonce = Utils.fromBase64(nonce);
+    }
+
+    if (!(ctext instanceof Uint8Array)) {
+      ctext = Utils.fromBase64(ctext);
     }
 
     return await this.rawDecodeMessage(nonce, ctext, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
