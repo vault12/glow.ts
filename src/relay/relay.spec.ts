@@ -33,6 +33,6 @@ describe('Relay', () => {
     const r = new Relay('https://z2.vault12.com');
     await Bob.connectToRelay(r);
     const count = await r.count(Bob);
-    console.log(count);
+    expect(count).toBe(1);
   });
 });

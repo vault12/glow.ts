@@ -150,11 +150,11 @@ export class Mailbox {
   async relaySend(guest: string, message: any, relay: Relay) {
     const guestPk = this.keyRing?.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`decodeMessage: don't know guest ${guest}`);
+      throw new Error(`relaySend: don't know guest ${guest}`);
     }
 
     const encodedMessage = await this.encodeMessage(guest, message);
-    const h2 = await this.nacl.h2(guestPk);
+    const h2 = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
     return await relay.upload(this, h2, encodedMessage);
   }
 
