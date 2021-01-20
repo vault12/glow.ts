@@ -7,6 +7,7 @@ describe('Relay', () => {
   let Alice: Mailbox;
   let Bob: Mailbox;
   let nonce: string;
+  let token: string;
 
   beforeAll(async () => {
     NaCl.setInstance();
@@ -27,7 +28,8 @@ describe('Relay', () => {
     const stat = await Alice.relaySend('Bob', 'message', testRelay);
     expect(stat.token.length).toBeGreaterThan(0);
     nonce = stat.nonce;
-    const ttl = await testRelay.messageStatus(Alice, stat.token);
+    token = stat.token;
+    const ttl = await testRelay.messageStatus(Alice, token);
     expect(ttl).toBeGreaterThan(0);
   });
 
@@ -53,5 +55,10 @@ describe('Relay', () => {
     expect(deletedResponse).toBe(0);
     const countAfterDeleted = await testRelay.count(Bob);
     expect(countAfterDeleted).toBe(0);
+  });
+
+  it('check deleted message status', async () => {
+    const ttl = await testRelay.messageStatus(Alice, token);
+    expect(ttl).toBe(-2); // the key is missing on the relay
   });
 });
