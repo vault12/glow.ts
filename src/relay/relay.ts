@@ -144,6 +144,24 @@ export class Relay {
     return await this.runCmd('messageStatus', mailbox, { token: storageToken });
   }
 
+  async startFileUpload(mailbox: Mailbox, toHpk: Uint8Array, fileSize: number, metadata: any) {
+    return await this.runCmd('startFileUpload', mailbox, {
+      to: Utils.toBase64(toHpk),
+      file_size: fileSize,
+      metadata: metadata
+    });
+  }
+
+  async uploadFileChunk(mailbox: Mailbox, uploadID: string, part: number, totalParts: number, fileData: any) {
+    return await this.runCmd('uploadFileChunk', mailbox, {
+      uploadID,
+      part,
+      last_chunk: (totalParts - 1 === part),
+      nonce: fileData.nonce,
+      ctext: fileData.ctext
+    });
+  }
+
   private async ensureNonceDiff(handshake: Uint8Array) {
     let nonce;
     let h2;

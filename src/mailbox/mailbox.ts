@@ -151,6 +151,19 @@ export class Mailbox {
     return data;
   }
 
+  async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array) {
+    const nonce = await this.makeNonce();
+    const ctext = await this.nacl.crypto_secretbox(message, nonce, secretKey);
+    return {
+      nonce: Utils.toBase64(nonce),
+      ctext: Utils.toBase64(ctext)
+    };
+  }
+
+  async decodeMessageSymmetric(nonce: Uint8Array, ctext: Uint8Array, secretKey: Uint8Array) {
+    return await this.nacl.crypto_secretbox_open(ctext, nonce, secretKey);
+  }
+
   async connectToRelay(relay: Relay) {
     await relay.openConnection();
     await relay.connectMailbox(this);
@@ -165,6 +178,33 @@ export class Mailbox {
     const encodedMessage = await this.encodeMessage(guest, message);
     const h2 = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
     return await relay.upload(this, h2, encodedMessage);
+  }
+
+  async startFileUpload(guest: string, relay: Relay, metadata: any) {
+    const guestPk = this.keyRing?.getGuestKey(guest);
+    if (!guestPk) {
+      throw new Error(`relaySend: don't know guest ${guest}`);
+    }
+    const h2 = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
+
+    const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
+    metadata.skey = Utils.toBase64(secretKey);
+
+    const encodedMetadata = await this.encodeMessage(guest, metadata);
+    await this.connectToRelay(relay);
+    const fileSize = metadata.orig_size;
+    const response = await relay.startFileUpload(this, h2, fileSize, {
+      nonce: Utils.toBase64(encodedMetadata.nonce),
+      ctext: Utils.toBase64(encodedMetadata.ctext)
+    });
+    response.skey = secretKey;
+    return response;
+  }
+
+  async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
+    part: number, totalParts: number, skey: Uint8Array) {
+    const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
+    return await relay.uploadFileChunk(this, uploadID, part, totalParts, encodedChunk);
   }
 
   // Makes a timestamp nonce that a relay expects for any crypto operations.
