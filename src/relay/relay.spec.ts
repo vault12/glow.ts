@@ -6,6 +6,7 @@ describe('Relay', () => {
   let testRelay: Relay;
   let Alice: Mailbox;
   let Bob: Mailbox;
+  let nonce: string;
 
   beforeAll(async () => {
     NaCl.setInstance();
@@ -23,9 +24,10 @@ describe('Relay', () => {
 
   it('send a message', async () => {
     await Alice.connectToRelay(testRelay);
-    const token = await Alice.relaySend('Bob', 'message', testRelay);
-    expect(token.length).toBeGreaterThan(0);
-    const ttl = await testRelay.messageStatus(Alice, token);
+    const stat = await Alice.relaySend('Bob', 'message', testRelay);
+    expect(stat.token.length).toBeGreaterThan(0);
+    nonce = stat.nonce;
+    const ttl = await testRelay.messageStatus(Alice, stat.token);
     expect(ttl).toBeGreaterThan(0);
   });
 
@@ -46,6 +48,10 @@ describe('Relay', () => {
   it('delete from Bob mailbox', async () => {
     await testRelay.delete(Bob, []);
     const count = await testRelay.count(Bob);
-    console.log(count);
+    expect(count).toBe(1);
+    const deletedResponse = await testRelay.delete(Bob, [ nonce ]);
+    expect(deletedResponse).toBe(0);
+    const countAfterDeleted = await testRelay.count(Bob);
+    expect(countAfterDeleted).toBe(0);
   });
 });

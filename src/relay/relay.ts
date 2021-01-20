@@ -5,7 +5,6 @@ import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Utils } from '../utils/utils';
 import { Mailbox } from '../mailbox/mailbox';
-import { Keys } from '../keys/keys';
 
 /**
  * Low-level operations with Zax relay.
@@ -47,6 +46,9 @@ export class Relay {
     }
 
     const data = await this.httpRequest('start_session', Utils.toBase64(this.clientToken));
+    if (!data) {
+      throw new Error(`${this.url} - start_session error; empty response`);
+    }
 
     // relay responds with its own counter token. Until session is
     // established these 2 tokens are handshake id.
@@ -112,13 +114,18 @@ export class Relay {
   }
 
   async upload(mailbox: Mailbox, toHpk: Uint8Array, payload: any) {
-    return await this.runCmd('upload', mailbox, {
+    const token = await this.runCmd('upload', mailbox, {
       to: Utils.toBase64(toHpk),
       payload: {
         nonce: Utils.toBase64(payload.nonce),
         ctext: Utils.toBase64(payload.ctext),
       }
     });
+    return {
+      token,
+      nonce: Utils.toBase64(payload.nonce),
+      ctext: Utils.toBase64(payload.ctext)
+    };
   }
 
   async count(mailbox: Mailbox) {
@@ -129,7 +136,7 @@ export class Relay {
     return await this.runCmd('download', mailbox);
   }
 
-  async delete(mailbox: Mailbox, nonceList: string[]) {
+  async delete(mailbox: Mailbox, nonceList: any) {
     return await this.runCmd('delete', mailbox, { payload: nonceList });
   }
 
@@ -205,7 +212,7 @@ export class Relay {
     return request;
   }
 
-  private async httpCall(command: string, ...data: string[]): Promise<any> {
+  private async httpCall(command: string, ...data: string[]): Promise<string> {
     axios.defaults.adapter = require('axios/lib/adapters/http');
 
     const requestPayload: AxiosRequestConfig = {
@@ -221,7 +228,7 @@ export class Relay {
     };
 
     const response = await axios(requestPayload);
-    return response.data;
+    return String(response.data);
   }
 
   private processData(rawResponse: string): string[] {
