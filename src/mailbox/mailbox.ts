@@ -207,6 +207,31 @@ export class Mailbox {
     return await relay.uploadFileChunk(this, uploadID, part, totalParts, encodedChunk);
   }
 
+  async getFileStatus(relay: Relay, uploadID: string) {
+    return await relay.fileStatus(this, uploadID);
+  }
+
+  async getFileMetadata(relay: Relay, uploadID: string) {
+    let sender;
+    let message;
+    const all: any[] = await relay.download(this);
+    const mapped = all.find(encryptedMessage => {
+      sender = this.keyRing?.getTagByHpk(encryptedMessage.from);
+      if (sender && encryptedMessage.kind === 'file') {
+        message = JSON.parse(encryptedMessage.data);
+        encryptedMessage.ctext = message.ctext;
+        return message.uploadID === uploadID;
+      }
+    });
+
+    if (sender) {
+      const originalMessage = await this.decodeMessage(sender, mapped.nonce, mapped.ctext);
+      return originalMessage;
+    }
+
+    return null;
+  }
+
   // Makes a timestamp nonce that a relay expects for any crypto operations.
   // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
   // is specified. 'data' will be packed as next 4 bytes after timestamp

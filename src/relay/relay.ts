@@ -162,6 +162,10 @@ export class Relay {
     });
   }
 
+  async fileStatus(mailbox: Mailbox, uploadID: string) {
+    return await this.runCmd('fileStatus', mailbox, { uploadID });
+  }
+
   private async ensureNonceDiff(handshake: Uint8Array) {
     let nonce;
     let h2;

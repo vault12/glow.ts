@@ -66,4 +66,19 @@ describe('Relay / File transfer', () => {
       expect(response.status).toBe('OK');
     }
   });
+
+  it('check file status and retrieve metadata', async () => {
+    const statusAlice = await Alice.getFileStatus(testRelay, uploadID);
+    expect(statusAlice.status).toBe('COMPLETE');
+    await Bob.connectToRelay(testRelay);
+    const statusBob = await Bob.getFileStatus(testRelay, uploadID);
+    expect(statusBob.status).toBe('COMPLETE');
+
+    const metadata = await Bob.getFileMetadata(testRelay, uploadID);
+    expect(typeof metadata.skey).toBe('string');
+    expect(metadata.orig_size).toBe(file.length);
+    expect(metadata).toHaveProperty('name');
+    expect(metadata).toHaveProperty('created');
+    expect(metadata).toHaveProperty('modified');
+  });
 });
