@@ -184,6 +184,10 @@ export class Relay {
     return nonce;
   }
 
+  async deleteFile(mailbox: Mailbox, uploadID: string) {
+    return await this.runCmd('deleteFile', mailbox, { uploadID });
+  }
+
   private async httpRequest(type: string, ...params: any[]) {
     let request;
     let mbx: Mailbox;

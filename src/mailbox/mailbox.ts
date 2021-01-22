@@ -238,6 +238,10 @@ export class Mailbox {
       Utils.fromBase64(encodedChunk.ctext), skey);
   }
 
+  async deleteFile(relay: Relay, uploadID: string) {
+    return await relay.deleteFile(this, uploadID);
+  }
+
   // Makes a timestamp nonce that a relay expects for any crypto operations.
   // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
   // is specified. 'data' will be packed as next 4 bytes after timestamp

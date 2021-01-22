@@ -99,4 +99,9 @@ describe('Relay / File transfer', () => {
   it('verify decoded file', async () => {
     expect(decodedFile).toEqual(new Uint8Array(file));
   });
+
+  it('delete file', async () => {
+    const response = await Bob.deleteFile(testRelay, uploadID);
+    expect(response.status).toEqual('OK');
+  });
 });
