@@ -12,6 +12,7 @@ describe('Relay / File transfer', () => {
   let chunkSize: number;
   let numberOfChunks: number;
   let file: Buffer;
+  let decodedFile: Uint8Array;
 
   let uploadID: string;
   let skey: Uint8Array;
@@ -80,5 +81,22 @@ describe('Relay / File transfer', () => {
     expect(metadata).toHaveProperty('name');
     expect(metadata).toHaveProperty('created');
     expect(metadata).toHaveProperty('modified');
+  });
+
+  it('download chunks', async () => {
+    decodedFile = new Uint8Array(file.length);
+    let downloadedBytes = 0;
+    for (let i = 0; i < numberOfChunks; i++) {
+      const chunk = await Bob.downloadFileChunk(testRelay, uploadID, i, skey);
+      if (!chunk) {
+        throw new Error('error dowloading chunk');
+      }
+      decodedFile.set(chunk, downloadedBytes);
+      downloadedBytes += chunk.length;
+    }
+  });
+
+  it('verify decoded file', async () => {
+    expect(decodedFile).toEqual(new Uint8Array(file));
   });
 });

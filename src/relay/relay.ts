@@ -162,6 +162,13 @@ export class Relay {
     });
   }
 
+  async downloadFileChunk(mailbox: Mailbox, uploadID: string, part: number) {
+    return await this.runCmd('downloadFileChunk', mailbox, {
+      uploadID,
+      part
+    });
+  }
+
   async fileStatus(mailbox: Mailbox, uploadID: string) {
     return await this.runCmd('fileStatus', mailbox, { uploadID });
   }
@@ -219,14 +226,26 @@ export class Relay {
           Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
         break;
       case 'command':
+        let ctext;
         mbx = params[0];
         const mbxHpk = mbx.getHpk();
         if (!mbxHpk) {
           throw new Error('No hpk');
         }
+
+        if (params[1].cmd === 'uploadFileChunk') {
+          ctext = params[1].ctext;
+          delete params[1].ctext;
+        }
         const message = await mbx.encodeMessage(this.relayId(), params[1], true);
-        request = await this.httpCall('command', mbxHpk,
-          Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
+
+        if (params[1].cmd === 'uploadFileChunk') {
+          request = await this.httpCall('command', mbxHpk,
+            Utils.toBase64(message.nonce), Utils.toBase64(message.ctext), ctext);
+        } else {
+          request = await this.httpCall('command', mbxHpk,
+            Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
+        }
         break;
       default:
         throw new Error(`Unknown request type: ${type}`);
@@ -281,6 +300,18 @@ export class Relay {
         throw new Error(`${this.url} - ${command}: Bad response`);
       }
       return parseInt(response[0], 10);
+    }
+
+    if (command === 'downloadFileChunk') {
+      if (response.length !== 3) {
+        throw new Error(`${this.url} - ${command}: Bad response`);
+      }
+      const nonce = response[0];
+      const ctext = response[1];
+      const decoded = await mailbox.decodeMessage(this.relayId(),
+      Utils.fromBase64(nonce), Utils.fromBase64(ctext), true);
+      decoded.ctext = response[2];
+      return decoded;
     }
 
     if (response.length !== 2) {

@@ -232,6 +232,12 @@ export class Mailbox {
     return null;
   }
 
+  async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array) {
+    const encodedChunk = await relay.downloadFileChunk(this, uploadID, part);
+    return await this.decodeMessageSymmetric(Utils.fromBase64(encodedChunk.nonce),
+      Utils.fromBase64(encodedChunk.ctext), skey);
+  }
+
   // Makes a timestamp nonce that a relay expects for any crypto operations.
   // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
   // is specified. 'data' will be packed as next 4 bytes after timestamp
