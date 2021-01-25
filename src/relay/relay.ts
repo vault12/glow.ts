@@ -22,37 +22,37 @@ export class Relay {
   private nacl: NaClDriver;
   private clientToken?: Uint8Array;
   private relayToken?: Uint8Array;
-  private diff?: number;
+  private diff: number;
   private relayPublicKey?: string;
 
   constructor(public url: string) {
     this.nacl = NaCl.getInstance();
+    this.diff = 0;
   }
 
+  // exchange tokens with a relay and get a temp session key for this relay
   async openConnection(): Promise<void> {
-    // exchange tokens with a relay and get a temp session key for this relay
     await this.getServerToken();
     await this.getServerKey();
   }
 
-  async getServerToken(): Promise<boolean> {
-    // Generate a clientToken. It will be used as part of handshake id with relay
+  private async getServerToken(): Promise<void> {
+    // Generate a client token. It will be used as part of handshake id with relay
     if (!this.clientToken) {
       this.clientToken = await this.nacl.random_bytes(config.RELAY_TOKEN_LEN);
     }
     // sanity check the client token
-    if (this.clientToken && this.clientToken.length !== config.RELAY_TOKEN_LEN) {
-      throw new Error(`Token must be ${config.RELAY_TOKEN_LEN} bytes`);
+    if (this.clientToken.length !== config.RELAY_TOKEN_LEN) {
+      throw new Error(`[Relay] Client token must be ${config.RELAY_TOKEN_LEN} bytes`);
     }
 
     const data = await this.httpRequest('start_session', Utils.toBase64(this.clientToken));
     if (!data) {
-      throw new Error(`${this.url} - start_session error; empty response`);
+      throw new Error(`[Relay] ${this.url} - start_session error; empty response`);
     }
 
-    // relay responds with its own counter token. Until session is
-    // established these 2 tokens are handshake id.
-    const lines = this.processData(data);
+    // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
+    const lines = this.splitString(data);
     this.relayToken = Utils.fromBase64(lines[0]);
     if (lines.length !== 2) {
       throw new Error(`Wrong start_session from ${this.url}`);
@@ -62,11 +62,9 @@ export class Relay {
     if (this.diff > 10) {
       console.log(`Relay ${this.url} requested difficulty ${this.diff}. Session handshake may take longer.`);
     }
-
-    return true;
   }
 
-  async getServerKey() {
+  async getServerKey(): Promise<void> {
     if (!this.clientToken || !this.relayToken) {
       throw new Error('No token');
     }
@@ -173,17 +171,6 @@ export class Relay {
     return await this.runCmd('fileStatus', mailbox, { uploadID });
   }
 
-  private async ensureNonceDiff(handshake: Uint8Array) {
-    let nonce;
-    let h2;
-    do {
-      nonce = await this.nacl.random_bytes(32);
-      h2 = await this.nacl.h2(Utils.decode_latin1(new Uint8Array([...handshake, ...nonce])));
-    } while(!this.arrayZeroBits(h2, this.diff));
-
-    return nonce;
-  }
-
   async deleteFile(mailbox: Mailbox, uploadID: string) {
     return await this.runCmd('deleteFile', mailbox, { uploadID });
   }
@@ -276,7 +263,7 @@ export class Relay {
     return String(response.data);
   }
 
-  private processData(rawResponse: string): string[] {
+  private splitString(rawResponse: string): string[] {
     let response = [];
     response = rawResponse.split('\r\n');
     if (response.length < 2) {
@@ -286,7 +273,7 @@ export class Relay {
   }
 
   private async processResponse(rawResponse: string, mailbox: Mailbox, command: string, params: any) {
-    const response = this.processData(String(rawResponse));
+    const response = this.splitString(String(rawResponse));
 
     if (command === 'delete') {
       return JSON.parse(rawResponse);
@@ -313,7 +300,7 @@ export class Relay {
       const nonce = response[0];
       const ctext = response[1];
       const decoded = await mailbox.decodeMessage(this.relayId(),
-      Utils.fromBase64(nonce), Utils.fromBase64(ctext), true);
+        Utils.fromBase64(nonce), Utils.fromBase64(ctext), true);
       decoded.ctext = response[2];
       return decoded;
     }
@@ -329,27 +316,47 @@ export class Relay {
     return decoded;
   }
 
-  private firstZeroBits(byte: any, n: any) {
-    return byte === ((byte >> n) << n);
+  // -------------------------------- Difficulty adjustment --------------------------------
+
+  private async ensureNonceDiff(handshake: Uint8Array) {
+    let nonce;
+    let h2;
+    do {
+      nonce = await this.nacl.random_bytes(32);
+      h2 = await this.nacl.h2(Utils.decode_latin1(new Uint8Array([...handshake, ...nonce])));
+    } while(!this.arrayZeroBits(h2, this.diff));
+
+    return nonce;
   }
 
-  private arrayZeroBits(arr: any, diff: any) {
-    let a, i, j, ref, rmd;
-    rmd = diff;
-    for (i = j = 0, ref = 1 + diff / 8; (0 <= ref ? j <= ref : j >= ref); i = 0 <= ref ? ++j : --j) {
-      a = arr[i];
-      if (rmd <= 0) {
+  // check whether the rightmost difficulty bits of an Uint8Array are 0, where
+  // the lowest indexes of the array represent those rightmost bits. Thus if
+  // the difficulty is 17, then array[0] and array[1] should be 0, as should the
+  // rightmost bit of array[2]. This is used for our difficulty settings in Zax to
+  // reduce burden on a busy server by ensuring clients have to do some
+  // additional work during the session handshake
+  private arrayZeroBits(array: Uint8Array, difficulty: number) {
+    let byte;
+    let n = difficulty;
+    for (let i = 0; i <= (1 + difficulty / 8); i++) {
+      byte = array[i];
+      if (n <= 0) {
         return true;
       }
-      if (rmd > 8) {
-        rmd -= 8;
-        if (a > 0) {
+      if (n > 8) {
+        n -= 8;
+        if (byte > 0) {
           return false;
         }
       } else {
-        return this.firstZeroBits(a, rmd);
+        return this.firstZeroBits(byte, n);
       }
     }
     return false;
+  }
+
+  // returns `true` if the rightmost n bits of a byte are 0
+  private firstZeroBits(byte: number, n: number): boolean {
+    return byte === ((byte >> n) << n);
   }
 }
