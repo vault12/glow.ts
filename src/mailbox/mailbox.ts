@@ -272,31 +272,16 @@ export class Mailbox {
     return nonce;
   }
 
-  private itoa(n: number) {
-    var floor, i, lg, pw, top;
-    if (n <= 0) {
-      return new Uint8Array((function() {
-        var j, results;
-        results = [];
-        for (i = j = 0; j <= 7; i = ++j) {
-          results.push(0);
-        }
-        return results;
-      })());
+  private itoa(num: number) {
+    // calculate length first
+    let hex = num.toString(16);
+    hex = hex.length & 1 ? `0${hex}` : hex;
+    const len = hex.length / 2;
+    const byteArray = new Uint8Array(len);
+
+    for (let j = 0, i = 0; i < hex.length; i += 2, j++) {
+      byteArray[j] = parseInt(hex[i] + hex[i + 1], 16);
     }
-    [floor, pw, lg] = [
-      Math.floor,
-      Math.pow,
-      Math.log // aliases
-    ];
-    top = floor(lg(n) / lg(256));
-    return new Uint8Array((function() {
-      var j, ref, results;
-      results = [];
-      for (i = j = ref = top; (ref <= 0 ? j <= 0 : j >= 0); i = ref <= 0 ? ++j : --j) {
-        results.push(floor(n / pw(256, i)) % 256);
-      }
-      return results;
-    })());
+    return byteArray;
   }
 }
