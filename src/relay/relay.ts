@@ -94,7 +94,33 @@ export class Relay {
 
   async connectMailbox(mbx: Mailbox): Promise<string> {
     const key = await mbx.createSessionKey(this.relayId(), true);
-    await this.sendRequest('prove', mbx, key?.publicKey);
+    if (!this.relayPublicKey) {
+      throw new Error('No relay public key');
+    }
+    const clientTempPk = Utils.fromBase64(key.publicKey);
+
+    await mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
+    delete this.relayPublicKey;
+    if (!this.clientToken || !this.relayToken) {
+      throw new Error('No token');
+    }
+
+    //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
+    const signature = new Uint8Array([...clientTempPk, ...this.relayToken, ...this.clientToken]);
+
+    const h2Signature = await this.nacl.h2(Utils.decode_latin1(signature));
+    const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
+    const payload = {
+      pub_key: mbx.keyRing?.getPubCommKey(),
+      nonce: Utils.toBase64(inner.nonce),
+      ctext: Utils.toBase64(inner.ctext)
+    };
+
+    const outer = await mbx.encodeMessage(this.relayId(), payload, true);
+    const clientTokenString = Utils.decode_latin1(this.clientToken);
+    const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
+    await this.sendRequest('prove', h2ClientToken, Utils.toBase64(clientTempPk),
+      Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
     return this.relayId();
   }
 
@@ -171,9 +197,27 @@ export class Relay {
       throw new Error(`Relay ${this.url} doesn't support command ${command}`);
     }
 
-    const data = { cmd: command, ...params };
+    params = { cmd: command, ...params };
 
-    const response = await this.sendRequest('command', mailbox, data);
+    let ctext;
+    const mbxHpk = mailbox.getHpk();
+    if (!mbxHpk) {
+      throw new Error('No hpk');
+    }
+    if (command === 'uploadFileChunk') {
+      ctext = params.ctext;
+      delete params.ctext;
+    }
+    const message = await mailbox.encodeMessage(this.relayId(), params, true);
+    let response;
+    if (command === 'uploadFileChunk') {
+      response = await this.sendRequest('command', mbxHpk,
+        Utils.toBase64(message.nonce), Utils.toBase64(message.ctext), ctext);
+    } else {
+      response = await this.sendRequest('command', mbxHpk,
+        Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
+    }
+
     if (!response) {
       throw new Error(`${this.url} - ${command} error; empty response`);
     }
@@ -181,70 +225,21 @@ export class Relay {
     return await this.processResponse(response, mailbox, command, params);
   }
 
-  private async sendRequest(type: string, ...params: any[]): Promise<string> {
+  private async sendRequest(type: string, ...params: string[]): Promise<string> {
     let request;
-    let mbx: Mailbox;
 
     switch (type) {
       case 'start_session':
-        console.log(params);
-        request = await this.httpCall('start_session', params[0]);
+        request = await this.httpCall('start_session', ...params);
         break;
       case 'verify_session':
-        request = await this.httpCall('verify_session', params[0], params[1]);
+        request = await this.httpCall('verify_session', ...params);
         break;
       case 'prove':
-        if (!this.relayPublicKey) {
-          throw new Error('No relay public key');
-        }
-        mbx = params[0];
-        const clientTempPk = Utils.fromBase64(params[1]);
-
-        await mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
-        delete this.relayPublicKey;
-        if (!this.clientToken || !this.relayToken) {
-          throw new Error('No token');
-        }
-
-        //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
-        const signature = new Uint8Array([...clientTempPk, ...this.relayToken, ...this.clientToken]);
-
-        const h2Signature = await this.nacl.h2(Utils.decode_latin1(signature));
-        const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
-        const payload = {
-          pub_key: mbx.keyRing?.getPubCommKey(),
-          nonce: Utils.toBase64(inner.nonce),
-          ctext: Utils.toBase64(inner.ctext)
-        };
-
-        const outer = await mbx.encodeMessage(this.relayId(), payload, true);
-        const clientTokenString = Utils.decode_latin1(this.clientToken);
-        const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
-
-        request = await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
-          Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
+        request = await this.httpCall('prove', ...params);
         break;
       case 'command':
-        let ctext;
-        mbx = params[0];
-        const mbxHpk = mbx.getHpk();
-        if (!mbxHpk) {
-          throw new Error('No hpk');
-        }
-
-        if (params[1].cmd === 'uploadFileChunk') {
-          ctext = params[1].ctext;
-          delete params[1].ctext;
-        }
-        const message = await mbx.encodeMessage(this.relayId(), params[1], true);
-
-        if (params[1].cmd === 'uploadFileChunk') {
-          request = await this.httpCall('command', mbxHpk,
-            Utils.toBase64(message.nonce), Utils.toBase64(message.ctext), ctext);
-        } else {
-          request = await this.httpCall('command', mbxHpk,
-            Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
-        }
+        request = await this.httpCall('command', ...params);
         break;
       default:
         throw new Error(`Unknown request type: ${type}`);

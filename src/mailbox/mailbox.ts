@@ -62,9 +62,10 @@ export class Mailbox {
     return this.keyRing?.getPubCommKey();
   }
 
-  async createSessionKey(session_id: string, forceNew: boolean) {
-    if (!forceNew && this.sessionKeys.has(session_id)) {
-      return Promise.resolve(this.sessionKeys.get(session_id));
+  async createSessionKey(session_id: string, forceNew: boolean): Promise<Keys> {
+    const existingKey = this.sessionKeys.get(session_id);
+    if (!forceNew && existingKey) {
+      return Promise.resolve(existingKey);
     }
 
     const keypair = await this.nacl.crypto_box_keypair();
