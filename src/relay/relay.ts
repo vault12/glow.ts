@@ -48,7 +48,7 @@ export class Relay {
       throw new Error(`[Relay] Client token must be ${config.RELAY_TOKEN_LEN} bytes`);
     }
 
-    const data = await this.sendRequest('start_session', Utils.toBase64(this.clientToken));
+    const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
     if (!data) {
       throw new Error(`[Relay] ${this.url} - start_session error; empty response`);
     }
@@ -84,7 +84,7 @@ export class Relay {
     }
 
     // relay gives us back temp session key masked by clientToken we started with
-    const relayPk = await this.sendRequest('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
+    const relayPk = await this.httpCall('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     this.relayPublicKey = relayPk;
   }
 
@@ -119,7 +119,7 @@ export class Relay {
     const outer = await mbx.encodeMessage(this.relayId(), payload, true);
     const clientTokenString = Utils.decode_latin1(this.clientToken);
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
-    await this.sendRequest('prove', h2ClientToken, Utils.toBase64(clientTempPk),
+    await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
       Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
     return this.relayId();
   }
@@ -211,10 +211,10 @@ export class Relay {
     const message = await mailbox.encodeMessage(this.relayId(), params, true);
     let response;
     if (command === 'uploadFileChunk') {
-      response = await this.sendRequest('command', mbxHpk,
+      response = await this.httpCall('command', mbxHpk,
         Utils.toBase64(message.nonce), Utils.toBase64(message.ctext), ctext);
     } else {
-      response = await this.sendRequest('command', mbxHpk,
+      response = await this.httpCall('command', mbxHpk,
         Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
     }
 
@@ -225,29 +225,7 @@ export class Relay {
     return await this.processResponse(response, mailbox, command, params);
   }
 
-  private async sendRequest(type: string, ...params: string[]): Promise<string> {
-    let request;
-
-    switch (type) {
-      case 'start_session':
-        request = await this.httpCall('start_session', ...params);
-        break;
-      case 'verify_session':
-        request = await this.httpCall('verify_session', ...params);
-        break;
-      case 'prove':
-        request = await this.httpCall('prove', ...params);
-        break;
-      case 'command':
-        request = await this.httpCall('command', ...params);
-        break;
-      default:
-        throw new Error(`Unknown request type: ${type}`);
-    }
-    return request;
-  }
-
-  private async httpCall(command: string, ...data: string[]): Promise<string> {
+  private async httpCall(command: string, ...params: string[]): Promise<string> {
     axios.defaults.adapter = require('axios/lib/adapters/http');
 
     const requestPayload: AxiosRequestConfig = {
@@ -257,7 +235,7 @@ export class Relay {
         'Accept': 'text/plain',
         'Content-Type': 'text/plain'
       },
-      data: data.join('\r\n'),
+      data: params.join('\r\n'),
       responseType: 'text',
       timeout: config.RELAY_AJAX_TIMEOUT
     };
@@ -327,7 +305,7 @@ export class Relay {
     do {
       nonce = await this.nacl.random_bytes(32);
       h2 = await this.nacl.h2(Utils.decode_latin1(new Uint8Array([...handshake, ...nonce])));
-    } while(!this.arrayZeroBits(h2, this.diff));
+    } while (!this.arrayZeroBits(h2, this.diff));
 
     return nonce;
   }
