@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
-import { Utils } from '../utils/utils';
+import { Base64, Utils } from '../utils/utils';
 import { Mailbox } from '../mailbox/mailbox';
 
 /**
@@ -30,6 +30,8 @@ export class Relay {
     this.diff = 0;
   }
 
+  // ------------------------------ Connection initialization ------------------------------
+
   // exchange tokens with a relay and get a temp session key for this relay
   async openConnection(): Promise<void> {
     await this.getServerToken();
@@ -46,7 +48,7 @@ export class Relay {
       throw new Error(`[Relay] Client token must be ${config.RELAY_TOKEN_LEN} bytes`);
     }
 
-    const data = await this.httpRequest('start_session', Utils.toBase64(this.clientToken));
+    const data = await this.sendRequest('start_session', Utils.toBase64(this.clientToken));
     if (!data) {
       throw new Error(`[Relay] ${this.url} - start_session error; empty response`);
     }
@@ -82,34 +84,21 @@ export class Relay {
     }
 
     // relay gives us back temp session key masked by clientToken we started with
-    const relayPk = await this.httpRequest('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
+    const relayPk = await this.sendRequest('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     this.relayPublicKey = relayPk;
   }
 
-  relayId() {
+  relayId(): string {
     return `relay_#${this.url}`;
   }
 
-  async runCmd(command: string, mailbox: Mailbox, params?: any) {
-    if (!Relay.relayCommands.includes(command)) {
-      throw new Error(`Relay ${this.url} doesn't support command ${command}`);
-    }
-
-    const data = { cmd: command, ...params };
-
-    const response = await this.httpRequest('command', mailbox, data);
-    if (!response) {
-      throw new Error(`${this.url} - ${command} error; empty response`);
-    }
-
-    return await this.processResponse(response, mailbox, command, params);
-  }
-
-  async connectMailbox(mbx: Mailbox) {
+  async connectMailbox(mbx: Mailbox): Promise<string> {
     const key = await mbx.createSessionKey(this.relayId(), true);
-    await this.httpRequest('prove', mbx, key?.publicKey);
+    await this.sendRequest('prove', mbx, key?.publicKey);
     return this.relayId();
   }
+
+  // ------------------------------ Relay commands public API ------------------------------
 
   async upload(mailbox: Mailbox, toHpk: Uint8Array, payload: any) {
     const token = await this.runCmd('upload', mailbox, {
@@ -134,11 +123,11 @@ export class Relay {
     return await this.runCmd('download', mailbox);
   }
 
-  async delete(mailbox: Mailbox, nonceList: any) {
+  async delete(mailbox: Mailbox, nonceList: any): Promise<number> {
     return await this.runCmd('delete', mailbox, { payload: nonceList });
   }
 
-  async messageStatus(mailbox: Mailbox, storageToken: any) {
+  async messageStatus(mailbox: Mailbox, storageToken: Base64): Promise<number> {
     return await this.runCmd('messageStatus', mailbox, { token: storageToken });
   }
 
@@ -175,11 +164,30 @@ export class Relay {
     return await this.runCmd('deleteFile', mailbox, { uploadID });
   }
 
-  private async httpRequest(type: string, ...params: any[]) {
+  // ------------------------------ Low-level server request handling ------------------------------
+
+  private async runCmd(command: string, mailbox: Mailbox, params?: any) {
+    if (!Relay.relayCommands.includes(command)) {
+      throw new Error(`Relay ${this.url} doesn't support command ${command}`);
+    }
+
+    const data = { cmd: command, ...params };
+
+    const response = await this.sendRequest('command', mailbox, data);
+    if (!response) {
+      throw new Error(`${this.url} - ${command} error; empty response`);
+    }
+
+    return await this.processResponse(response, mailbox, command, params);
+  }
+
+  private async sendRequest(type: string, ...params: any[]): Promise<string> {
     let request;
     let mbx: Mailbox;
+
     switch (type) {
       case 'start_session':
+        console.log(params);
         request = await this.httpCall('start_session', params[0]);
         break;
       case 'verify_session':
@@ -213,7 +221,7 @@ export class Relay {
         const clientTokenString = Utils.decode_latin1(this.clientToken);
         const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
 
-        await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
+        request = await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
           Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
         break;
       case 'command':

@@ -48,7 +48,7 @@ describe('Relay / File transfer', () => {
       orig_size: 765,
       created: randomNumber(1480000000, 1520000000),
       modified: randomNumber(1480000000, 1520000000)
-    })
+    });
 
     expect(response).toHaveProperty('uploadID');
     expect(response).toHaveProperty('max_chunk_size');
