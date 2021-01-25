@@ -31,7 +31,7 @@ describe('Relay / File transfer', () => {
     await Alice.keyRing?.addGuest('Bob', bobKey);
     await Bob.keyRing?.addGuest('Alice', aliceKey);
 
-    file = fs.readFileSync('src/relay/test.zip');
+    file = fs.readFileSync('.test.zip');
     expect(file.length).toBe(765);
 
     // Arbitrary chunk size for testing purposes
