@@ -106,7 +106,7 @@ export class Mailbox {
     return await this.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
-  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array, skFrom: Uint8Array, nonceData = null) {
+  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array, skFrom: Uint8Array, nonceData?: number) {
     const nonce = await this.makeNonce(nonceData);
     const ctext = await this.nacl.crypto_box(message, nonce, pkTo, skFrom);
     return { nonce, ctext };
@@ -246,34 +246,28 @@ export class Mailbox {
   // Makes a timestamp nonce that a relay expects for any crypto operations.
   // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
   // is specified. 'data' will be packed as next 4 bytes after timestamp
-  // Returns a Promise
-  private async makeNonce(data: any = null, time = Date.now()) {
+  private async makeNonce(data?: number) {
     const nonce = await this.nacl.crypto_box_random_nonce();
-    let aData, aTime, headerLen, i, j, k, l, ref, ref1, ref2;
+    let headerLen;
     if (!((nonce != null) && nonce.length === 24)) {
       throw new Error('RNG failed, try again?');
     }
     // split timestamp integer as an array of bytes
     headerLen = 8; // max timestamp size
-    aTime = this.itoa(Math.floor(time / 1000));
+    const aTime = this.itoa(Math.floor(Date.now() / 1000));
+
     if (data) {
       headerLen += 4; // extra 4 bytes for custom data
     }
 
-    for (i = j = 0, ref = headerLen; (0 <= ref ? j < ref : j > ref); i = 0 <= ref ? ++j : --j) {
-      // zero out nonce header area
-      nonce[i] = 0;
-    }
-    for (i = k = 0, ref1 = aTime.length - 1; (0 <= ref1 ? k <= ref1 : k >= ref1); i = 0 <= ref1 ? ++k : --k) {
-      // copy the timestamp into the first 8 bytes of nonce
-      nonce[8 - aTime.length + i] = aTime[i];
-    }
+    // zero out nonce header area
+    nonce.fill(0, 0, headerLen);
+    // copy the timestamp into the first 8 bytes of nonce
+    nonce.set(aTime, 8 - aTime.length);
+    // copy data if present
     if (data) {
-      aData = this.itoa(data);
-      for (i = l = 0, ref2 = aData.length - 1; (0 <= ref2 ? l <= ref2 : l >= ref2); i = 0 <= ref2 ? ++l : --l) {
-        // copy data if present
-        nonce[12 - aData.length + i] = aData[i];
-      }
+      const aData = this.itoa(data);
+      nonce.set(aData, 12 - aData.length);
     }
     return nonce;
   }
