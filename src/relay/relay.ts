@@ -157,42 +157,9 @@ export class Relay {
     return await this.runCmd('messageStatus', mailbox, { token: storageToken });
   }
 
-  async startFileUpload(mailbox: Mailbox, toHpk: Uint8Array, fileSize: number, metadata: any) {
-    return await this.runCmd('startFileUpload', mailbox, {
-      to: Utils.toBase64(toHpk),
-      file_size: fileSize,
-      metadata: metadata
-    });
-  }
-
-  async uploadFileChunk(mailbox: Mailbox, uploadID: string, part: number, totalParts: number, fileData: any) {
-    return await this.runCmd('uploadFileChunk', mailbox, {
-      uploadID,
-      part,
-      last_chunk: (totalParts - 1 === part),
-      nonce: fileData.nonce,
-      ctext: fileData.ctext
-    });
-  }
-
-  async downloadFileChunk(mailbox: Mailbox, uploadID: string, part: number) {
-    return await this.runCmd('downloadFileChunk', mailbox, {
-      uploadID,
-      part
-    });
-  }
-
-  async fileStatus(mailbox: Mailbox, uploadID: string) {
-    return await this.runCmd('fileStatus', mailbox, { uploadID });
-  }
-
-  async deleteFile(mailbox: Mailbox, uploadID: string) {
-    return await this.runCmd('deleteFile', mailbox, { uploadID });
-  }
-
   // ------------------------------ Low-level server request handling ------------------------------
 
-  private async runCmd(command: string, mailbox: Mailbox, params?: any) {
+  public async runCmd(command: string, mailbox: Mailbox, params?: any) {
     if (!Relay.relayCommands.includes(command)) {
       throw new Error(`Relay ${this.url} doesn't support command ${command}`);
     }

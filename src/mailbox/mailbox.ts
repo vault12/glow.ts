@@ -30,6 +30,8 @@ export class Mailbox {
     return mbx;
   }
 
+  // -------------------------------- Alternative initializers --------------------------------
+
   // You can create a Mailbox where the secret identity key is derived from a well-known seed
   static async fromSeed(id: string, seed: Uint8Array): Promise<Mailbox> {
     const mbx = await this.new(id);
@@ -170,6 +172,8 @@ export class Mailbox {
     await relay.connectMailbox(this);
   }
 
+  // ------------------------------ Relay commands public API ------------------------------
+
   async relaySend(guest: string, message: any, relay: Relay) {
     const guestPk = this.keyRing?.getGuestKey(guest);
     if (!guestPk) {
@@ -186,7 +190,7 @@ export class Mailbox {
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
     }
-    const h2 = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
+    const toHpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
 
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
     metadata.skey = Utils.toBase64(secretKey);
@@ -194,9 +198,13 @@ export class Mailbox {
     const encodedMetadata = await this.encodeMessage(guest, metadata);
     await this.connectToRelay(relay);
     const fileSize = metadata.orig_size;
-    const response = await relay.startFileUpload(this, h2, fileSize, {
-      nonce: Utils.toBase64(encodedMetadata.nonce),
-      ctext: Utils.toBase64(encodedMetadata.ctext)
+    const response = await relay.runCmd('startFileUpload', this, {
+      to: Utils.toBase64(toHpk),
+      file_size: fileSize,
+      metadata: {
+        nonce: Utils.toBase64(encodedMetadata.nonce),
+        ctext: Utils.toBase64(encodedMetadata.ctext)
+      }
     });
     response.skey = secretKey;
     return response;
@@ -205,11 +213,17 @@ export class Mailbox {
   async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array) {
     const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
-    return await relay.uploadFileChunk(this, uploadID, part, totalParts, encodedChunk);
+    return await relay.runCmd('uploadFileChunk', this, {
+      uploadID,
+      part,
+      last_chunk: (totalParts - 1 === part),
+      nonce: encodedChunk.nonce,
+      ctext: encodedChunk.ctext
+    });
   }
 
   async getFileStatus(relay: Relay, uploadID: string) {
-    return await relay.fileStatus(this, uploadID);
+    return await relay.runCmd('fileStatus', this, { uploadID });
   }
 
   async getFileMetadata(relay: Relay, uploadID: string) {
@@ -234,13 +248,13 @@ export class Mailbox {
   }
 
   async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array) {
-    const encodedChunk = await relay.downloadFileChunk(this, uploadID, part);
+    const encodedChunk = await relay.runCmd('downloadFileChunk', this, { uploadID, part });
     return await this.decodeMessageSymmetric(Utils.fromBase64(encodedChunk.nonce),
       Utils.fromBase64(encodedChunk.ctext), skey);
   }
 
   async deleteFile(relay: Relay, uploadID: string) {
-    return await relay.deleteFile(this, uploadID);
+    return await relay.runCmd('deleteFile', this, { uploadID });
   }
 
   // Makes a timestamp nonce that a relay expects for any crypto operations.
@@ -272,7 +286,8 @@ export class Mailbox {
     return nonce;
   }
 
-  private itoa(num: number) {
+  // Split an integer into an array of bytes
+  private itoa(num: number): Uint8Array {
     // calculate length first
     let hex = num.toString(16);
     hex = hex.length & 1 ? `0${hex}` : hex;
