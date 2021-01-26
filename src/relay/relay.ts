@@ -179,8 +179,7 @@ export class Relay {
   }
 
   private splitString(rawResponse: string): string[] {
-    let response = [];
-    response = rawResponse.split('\r\n');
+    let response = rawResponse.split('\r\n');
     if (response.length < 2) {
       response = rawResponse.split('\n');
     }

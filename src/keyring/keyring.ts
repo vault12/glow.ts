@@ -29,21 +29,23 @@ export class KeyRing {
   static readonly commKeyTag = 'comm_key';
   static readonly guestRegistryTag = 'guest_registry';
 
-  private cryptoStorage?: CryptoStorage;
   public commKey?: Keys;
   public hpk?: Uint8Array;
+
+  private storage: CryptoStorage;
   private guestKeys: Map<string, KeyRecord> = new Map();
   private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
   private nacl: NaClDriver;
 
-  private constructor(naclDriver: NaClDriver) {
+  private constructor(naclDriver: NaClDriver, cryptoStorage: CryptoStorage) {
     this.nacl = naclDriver;
+    this.storage = cryptoStorage;
   }
 
   static async new(id: string, storageDriver?: StorageDriver): Promise<KeyRing> {
     const nacl = NaCl.getInstance();
-    const keyRing = new KeyRing(nacl);
-    keyRing.cryptoStorage = await CryptoStorage.new(storageDriver || new LocalStorageDriver(), id);
+    const cryptoStorage = await CryptoStorage.new(storageDriver || new LocalStorageDriver(), id);
+    const keyRing = new KeyRing(nacl, cryptoStorage);
     await keyRing.loadCommKey();
     await keyRing.loadGuestKeys();
     return keyRing;
@@ -59,13 +61,6 @@ export class KeyRing {
       await restoredKeyRing.addGuest(key, value as string);
     }
     return restoredKeyRing;
-  }
-
-  get storage(): CryptoStorage {
-    if (!this.cryptoStorage) {
-      throw new Error('No CryptoStorage set');
-    }
-    return this.cryptoStorage;
   }
 
   getNumberOfGuests(): number {

@@ -9,24 +9,22 @@ import { Keys } from '../keys/keys';
  * Low-level operations with Zax relay.
  */
 export class Mailbox {
+  public keyRing: KeyRing;
+
   private nacl: NaClDriver;
   private identity?: string;
-  public keyRing?: KeyRing;
   private sessionKeys: Map<string, Keys> = new Map();
 
-  private constructor(naclDriver: NaClDriver) {
+  private constructor(naclDriver: NaClDriver, keyRing: KeyRing) {
     this.nacl = naclDriver;
+    this.keyRing = keyRing;
   }
 
   static async new(id: string, backup?: string): Promise<Mailbox> {
     const nacl = NaCl.getInstance();
-    const mbx = new Mailbox(nacl);
+    const keyRing = backup ? await KeyRing.fromBackup(id, backup) : await KeyRing.new(id);
+    const mbx = new Mailbox(nacl, keyRing);
     mbx.identity = id;
-    if (backup) {
-      mbx.keyRing = await KeyRing.fromBackup(id, backup);
-    } else {
-      mbx.keyRing = await KeyRing.new(id);
-    }
     return mbx;
   }
 
@@ -35,14 +33,14 @@ export class Mailbox {
   // You can create a Mailbox where the secret identity key is derived from a well-known seed
   static async fromSeed(id: string, seed: Uint8Array): Promise<Mailbox> {
     const mbx = await this.new(id);
-    await mbx.keyRing?.setCommFromSeed(seed);
+    await mbx.keyRing.setCommFromSeed(seed);
     return mbx;
   }
 
   // You can also create a Mailbox if you already know the secret identity key
   static async fromSecKey(id: string, rawSecretKey: Uint8Array): Promise<Mailbox> {
     const mbx = await this.new(id);
-    await mbx.keyRing?.setCommFromSecKey(rawSecretKey);
+    await mbx.keyRing.setCommFromSecKey(rawSecretKey);
     return mbx;
   }
 
@@ -54,14 +52,14 @@ export class Mailbox {
   // This is the HPK (hash of the public key) of your mailbox. This is what Zax relays
   // use as the universal address of your mailbox.
   getHpk(): string | undefined {
-    return this.keyRing?.hpk ? Utils.toBase64(this.keyRing.hpk) : undefined;
+    return this.keyRing.hpk ? Utils.toBase64(this.keyRing.hpk) : undefined;
   }
 
   // This is your public identity and default communication key. Your
   // correspondents can know it, whereas Relays do not need it (other than
   // temporarily for internal use during the ownership proof)
   getPubCommKey(): string | undefined {
-    return this.keyRing?.getPubCommKey();
+    return this.keyRing.getPubCommKey();
   }
 
   async createSessionKey(session_id: string, forceNew: boolean): Promise<Keys> {
@@ -81,13 +79,13 @@ export class Mailbox {
   // temporary, not the persistent collection of session keys. skTag lets you
   // specifiy the secret key in a key ring
   async encodeMessage(guest: string, message: any, session = false, skTag = null) {
-    const guestPk = this.keyRing?.getGuestKey(guest);
+    const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`encodeMessage: don't know guest ${guest}`);
     }
 
     let privateKey;
-    privateKey = this.keyRing?.commKey?.privateKey;
+    privateKey = this.keyRing.commKey?.privateKey;
     if (!privateKey) {
       throw new Error('encodeMessage: no comm key');
     }
@@ -116,12 +114,12 @@ export class Mailbox {
 
   async decodeMessage(guest: string, nonce: Uint8Array | Base64, ctext: Uint8Array | Base64,
     session = false, skTag = null) {
-    const guestPk = this.keyRing?.getGuestKey(guest);
+    const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`decodeMessage: don't know guest ${guest}`);
     }
 
-    let privateKey = this.keyRing?.commKey?.privateKey;
+    let privateKey = this.keyRing.commKey?.privateKey;
     if (!privateKey) {
       throw new Error('decodeMessage: no comm key');
     }
@@ -175,7 +173,7 @@ export class Mailbox {
   // ------------------------------ Relay message commands (public API) ------------------------------
 
   async upload(relay: Relay, guest: string, message: any) {
-    const guestPk = this.keyRing?.getGuestKey(guest);
+    const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
     }
@@ -216,7 +214,7 @@ export class Mailbox {
   // ------------------------------ Relay file commands (public API) ------------------------------
 
   async startFileUpload(guest: string, relay: Relay, metadata: any) {
-    const guestPk = this.keyRing?.getGuestKey(guest);
+    const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
     }
@@ -261,7 +259,7 @@ export class Mailbox {
     let message;
     const all: any[] = await this.download(relay);
     const mapped = all.find(encryptedMessage => {
-      sender = this.keyRing?.getTagByHpk(encryptedMessage.from);
+      sender = this.keyRing.getTagByHpk(encryptedMessage.from);
       if (sender && encryptedMessage.kind === 'file') {
         message = JSON.parse(encryptedMessage.data);
         encryptedMessage.ctext = message.ctext;
@@ -295,7 +293,7 @@ export class Mailbox {
   private async makeNonce(data?: number) {
     const nonce = await this.nacl.crypto_box_random_nonce();
     let headerLen;
-    if (!((nonce != null) && nonce.length === 24)) {
+    if (nonce.length !== 24) {
       throw new Error('RNG failed, try again?');
     }
     // split timestamp integer as an array of bytes
