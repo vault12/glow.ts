@@ -25,40 +25,40 @@ describe('Relay', () => {
 
   it('send a message', async () => {
     await Alice.connectToRelay(testRelay);
-    const stat = await Alice.relaySend('Bob', 'message', testRelay);
+    const stat = await Alice.upload(testRelay, 'Bob', 'message');
     expect(stat.token.length).toBeGreaterThan(0);
     nonce = stat.nonce;
     token = stat.token;
-    const ttl = await testRelay.messageStatus(Alice, token);
+    const ttl = await Alice.messageStatus(testRelay, token);
     expect(ttl).toBeGreaterThan(0);
   });
 
   it('count Bob mailbox', async () => {
     await Bob.connectToRelay(testRelay);
-    const count = await testRelay.count(Bob);
+    const count = await Bob.count(testRelay);
     expect(count).toBe(1);
   });
 
   it('download Bob mailbox', async () => {
     await Bob.connectToRelay(testRelay);
-    const downloaded = await testRelay.download(Bob);
+    const downloaded = await Bob.download(testRelay);
     const encodedMessage = downloaded[0];
     const msg = await Bob.decodeMessage('Alice', encodedMessage.nonce, encodedMessage.data);
     expect(msg).toBe('message');
   });
 
   it('delete from Bob mailbox', async () => {
-    await testRelay.delete(Bob, []);
-    const count = await testRelay.count(Bob);
+    await testRelay.runCmd('delete', Bob, { payload: [] });
+    const count = await Bob.count(testRelay);
     expect(count).toBe(1);
-    const deletedResponse = await testRelay.delete(Bob, [ nonce ]);
+    const deletedResponse = await testRelay.runCmd('delete', Bob, { payload: [ nonce ]});
     expect(deletedResponse).toBe(0);
-    const countAfterDeleted = await testRelay.count(Bob);
+    const countAfterDeleted = await Bob.count(testRelay);
     expect(countAfterDeleted).toBe(0);
   });
 
   it('check deleted message status', async () => {
-    const ttl = await testRelay.messageStatus(Alice, token);
+    const ttl = await Alice.messageStatus(testRelay, token);
     expect(ttl).toBe(-2); // the key is missing on the relay
   });
 });

@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
-import { Base64, Utils } from '../utils/utils';
+import { Utils } from '../utils/utils';
 import { Mailbox } from '../mailbox/mailbox';
 
 /**
@@ -124,42 +124,7 @@ export class Relay {
     return this.relayId();
   }
 
-  // ------------------------------ Relay commands public API ------------------------------
-
-  async upload(mailbox: Mailbox, toHpk: Uint8Array, payload: any) {
-    const token = await this.runCmd('upload', mailbox, {
-      to: Utils.toBase64(toHpk),
-      payload: {
-        nonce: Utils.toBase64(payload.nonce),
-        ctext: Utils.toBase64(payload.ctext),
-      }
-    });
-    return {
-      token,
-      nonce: Utils.toBase64(payload.nonce),
-      ctext: Utils.toBase64(payload.ctext)
-    };
-  }
-
-  async count(mailbox: Mailbox) {
-    return await this.runCmd('count', mailbox);
-  }
-
-  async download(mailbox: Mailbox) {
-    return await this.runCmd('download', mailbox);
-  }
-
-  async delete(mailbox: Mailbox, nonceList: any): Promise<number> {
-    return await this.runCmd('delete', mailbox, { payload: nonceList });
-  }
-
-  async messageStatus(mailbox: Mailbox, storageToken: Base64): Promise<number> {
-    return await this.runCmd('messageStatus', mailbox, { token: storageToken });
-  }
-
-  // ------------------------------ Low-level server request handling ------------------------------
-
-  public async runCmd(command: string, mailbox: Mailbox, params?: any) {
+  async runCmd(command: string, mailbox: Mailbox, params?: any) {
     if (!Relay.relayCommands.includes(command)) {
       throw new Error(`Relay ${this.url} doesn't support command ${command}`);
     }
@@ -191,6 +156,8 @@ export class Relay {
 
     return await this.processResponse(response, mailbox, command, params);
   }
+
+  // ------------------------------ Low-level server request handling ------------------------------
 
   private async httpCall(command: string, ...params: string[]): Promise<string> {
     axios.defaults.adapter = require('axios/lib/adapters/http');

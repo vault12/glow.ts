@@ -172,18 +172,48 @@ export class Mailbox {
     await relay.connectMailbox(this);
   }
 
-  // ------------------------------ Relay commands public API ------------------------------
+  // ------------------------------ Relay message commands (public API) ------------------------------
 
-  async relaySend(guest: string, message: any, relay: Relay) {
+  async upload(relay: Relay, guest: string, message: any) {
     const guestPk = this.keyRing?.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
     }
 
     const encodedMessage = await this.encodeMessage(guest, message);
-    const h2 = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
-    return await relay.upload(this, h2, encodedMessage);
+    const toHpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
+
+    const token = await relay.runCmd('upload', this, {
+      to: Utils.toBase64(toHpk),
+      payload: {
+        nonce: Utils.toBase64(encodedMessage.nonce),
+        ctext: Utils.toBase64(encodedMessage.ctext),
+      }
+    });
+    return {
+      token,
+      nonce: Utils.toBase64(encodedMessage.nonce),
+      ctext: Utils.toBase64(encodedMessage.ctext)
+    };
   }
+
+  async download(relay: Relay) {
+    return await relay.runCmd('download', this);
+  }
+
+  async count(relay: Relay): Promise<number> {
+    return await relay.runCmd('count', this);
+  }
+
+  async delete(relay: Relay, nonceList: string[]): Promise<number> {
+    return await relay.runCmd('delete', this, { payload: nonceList });
+  }
+
+  async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
+    return await relay.runCmd('messageStatus', this, { token: storageToken });
+  }
+
+  // ------------------------------ Relay file commands (public API) ------------------------------
 
   async startFileUpload(guest: string, relay: Relay, metadata: any) {
     const guestPk = this.keyRing?.getGuestKey(guest);
@@ -229,7 +259,7 @@ export class Mailbox {
   async getFileMetadata(relay: Relay, uploadID: string) {
     let sender;
     let message;
-    const all: any[] = await relay.download(this);
+    const all: any[] = await this.download(relay);
     const mapped = all.find(encryptedMessage => {
       sender = this.keyRing?.getTagByHpk(encryptedMessage.from);
       if (sender && encryptedMessage.kind === 'file') {
@@ -256,6 +286,8 @@ export class Mailbox {
   async deleteFile(relay: Relay, uploadID: string) {
     return await relay.runCmd('deleteFile', this, { uploadID });
   }
+
+  // ------------------------------ Nonce helpers ------------------------------
 
   // Makes a timestamp nonce that a relay expects for any crypto operations.
   // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
