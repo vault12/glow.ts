@@ -61,7 +61,7 @@ describe('Keyring', () => {
     for (let i = 0; i < 10; i++) {
       expect(originalRing.getGuestKey(`keys${i}`)).toEqual(restored.getGuestKey(`keys${i}`));
     }
-    expect(originalRing.getHpk()).toEqual(restored.getHpk());
+    expect(await originalRing.getHpk()).toEqual(await restored.getHpk());
 
     expect(backup).toBe(backedUpAgain);
   });

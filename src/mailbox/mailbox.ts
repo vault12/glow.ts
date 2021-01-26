@@ -51,14 +51,14 @@ export class Mailbox {
 
   // This is the HPK (hash of the public key) of your mailbox. This is what Zax relays
   // use as the universal address of your mailbox.
-  getHpk(): string | undefined {
-    return this.keyRing.hpk ? Utils.toBase64(this.keyRing.hpk) : undefined;
+  async getHpk(): Promise<string> {
+    return await this.keyRing.getHpk();
   }
 
   // This is your public identity and default communication key. Your
   // correspondents can know it, whereas Relays do not need it (other than
   // temporarily for internal use during the ownership proof)
-  getPubCommKey(): string | undefined {
+  getPubCommKey(): string {
     return this.keyRing.getPubCommKey();
   }
 

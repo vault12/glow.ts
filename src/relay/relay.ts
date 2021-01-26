@@ -99,7 +99,7 @@ export class Relay {
     }
     const clientTempPk = Utils.fromBase64(key.publicKey);
 
-    await mbx.keyRing?.addTempGuest(this.relayId(), this.relayPublicKey);
+    await mbx.keyRing.addTempGuest(this.relayId(), this.relayPublicKey);
     delete this.relayPublicKey;
     if (!this.clientToken || !this.relayToken) {
       throw new Error('No token');
@@ -111,7 +111,7 @@ export class Relay {
     const h2Signature = await this.nacl.h2(Utils.decode_latin1(signature));
     const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
     const payload = {
-      pub_key: mbx.keyRing?.getPubCommKey(),
+      pub_key: mbx.keyRing.getPubCommKey(),
       nonce: Utils.toBase64(inner.nonce),
       ctext: Utils.toBase64(inner.ctext)
     };
@@ -132,10 +132,8 @@ export class Relay {
     params = { cmd: command, ...params };
 
     let ctext;
-    const mbxHpk = mailbox.getHpk();
-    if (!mbxHpk) {
-      throw new Error('No hpk');
-    }
+    const mbxHpk = await mailbox.getHpk();
+
     if (command === 'uploadFileChunk') {
       ctext = params.ctext;
       delete params.ctext;

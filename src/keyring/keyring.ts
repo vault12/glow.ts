@@ -30,7 +30,6 @@ export class KeyRing {
   static readonly guestRegistryTag = 'guest_registry';
 
   public commKey: Keys;
-  public hpk?: Uint8Array;
 
   private storage: CryptoStorage;
   private guestKeys: Map<string, KeyRecord> = new Map();
@@ -48,7 +47,7 @@ export class KeyRing {
     const cryptoStorage = await CryptoStorage.new(storageDriver || new LocalStorageDriver(), id);
     const commKey = await KeyRing.getCommKey(nacl, cryptoStorage);
     const keyRing = new KeyRing(nacl, cryptoStorage, commKey);
-    await keyRing.setHpk(commKey.publicKey);
+
     await cryptoStorage.save(KeyRing.commKeyTag, commKey);
     await keyRing.loadGuestKeys();
     return keyRing;
@@ -74,8 +73,9 @@ export class KeyRing {
     return this.commKey.publicKey;
   }
 
-  getHpk(): string | undefined {
-    return this.hpk ? Utils.toBase64(this.hpk) : undefined;
+  async getHpk(): Promise<string> {
+    const hpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(this.commKey.publicKey)));
+    return Utils.toBase64(hpk);
   }
 
   getTagByHpk(hpk: string): string | null {
@@ -122,13 +122,11 @@ export class KeyRing {
 
   async setCommFromSeed(seed: Uint8Array): Promise<void> {
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_seed(seed));
-    await this.setHpk(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
   async setCommFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
-    await this.setHpk(this.commKey.publicKey);
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
@@ -192,10 +190,6 @@ export class KeyRing {
 
   private async saveGuests() {
     await this.storage.save(KeyRing.guestRegistryTag, Array.from(this.guestKeys.entries()));
-  }
-
-  private async setHpk(publicKey: Base64) {
-    this.hpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(publicKey)));
   }
 
   private static async getCommKey(nacl: NaClDriver, storage: CryptoStorage): Promise<Keys> {

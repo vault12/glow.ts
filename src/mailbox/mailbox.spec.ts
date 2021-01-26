@@ -13,29 +13,23 @@ describe('Mailbox', () => {
   });
 
   it('exchange keys', async () => {
-    if (!Alice.keyRing || !Bob.keyRing) {
-      throw new Error();
-    }
-
     expect(Alice.keyRing.getNumberOfGuests()).toBe(0);
     expect(Alice.keyRing.getGuestKey('Bob_mbx')).toBeNull();
-    await Alice.keyRing.addGuest('Bob_mbx', Bob.getPubCommKey() || '');
+    await Alice.keyRing.addGuest('Bob_mbx', Bob.getPubCommKey());
     expect(Alice.keyRing.getNumberOfGuests()).toBe(1);
     expect(Alice.keyRing.getGuestKey('Bob_mbx')).not.toBeNull();
 
     expect(Bob.keyRing.getNumberOfGuests()).toBe(0);
     expect(Bob.keyRing.getGuestKey('Alice_mbx')).toBeNull();
-    await Bob.keyRing.addGuest('Alice_mbx', Alice.getPubCommKey() || '');
+    await Bob.keyRing.addGuest('Alice_mbx', Alice.getPubCommKey());
     expect(Bob.keyRing.getNumberOfGuests()).toBe(1);
     expect(Bob.keyRing.getGuestKey('Alice_mbx')).not.toBeNull();
   });
 
   it('Mailbox from a well known seed', async () => {
     const mbx = await Mailbox.fromSeed('from_seed', Utils.encode_latin1('hello'));
-    expect(mbx.keyRing?.getPubCommKey()).toBe('2DM+z1PaxGXVnzsDh4zv+IlH7sV8llEFoEmg9fG3pRA=');
-    expect(mbx.keyRing?.hpk).toEqual(
-      new Uint8Array([249, 209, 90, 99, 252, 44, 187, 27, 13, 101, 229, 199, 235, 31, 235, 119, 224, 25,
-        207, 215, 94, 130, 71, 230, 44, 22, 217, 0, 201, 41, 61, 222]));
+    expect(mbx.keyRing.getPubCommKey()).toBe('2DM+z1PaxGXVnzsDh4zv+IlH7sV8llEFoEmg9fG3pRA=');
+    expect(await mbx.getHpk()).toEqual('+dFaY/wsuxsNZeXH6x/rd+AZz9degkfmLBbZAMkpPd4=');
   });
 
   it('Mailbox backup & restore', async () => {
@@ -44,22 +38,16 @@ describe('Mailbox', () => {
       215, 100, 241, 87, 187, 9, 53, 179, 248, 176, 242, 249, 101, 68, 48, 48, 9, 219, 211]);
 
     const mbx = await Mailbox.fromSeed('from_seed2', Utils.encode_latin1('hello2'));
-    if (!mbx.keyRing) {
-      throw new Error('no keyRing');
-    }
 
     expect(mbx.keyRing.getPubCommKey()).toBe(pubCommKey);
-    expect(mbx.keyRing.hpk).toEqual(hpk);
+    expect(await mbx.getHpk()).toEqual(Utils.toBase64(hpk));
 
     const backup = await mbx.keyRing.backup();
 
     const restoredMbx = await Mailbox.fromBackup('from_backup', backup);
-    if (!restoredMbx.keyRing) {
-      throw new Error('no keyRing');
-    }
 
     expect(restoredMbx.keyRing.getPubCommKey()).toBe(pubCommKey);
-    expect(restoredMbx.keyRing.hpk).toEqual(hpk);
+    expect(await restoredMbx.getHpk()).toEqual(Utils.toBase64(hpk));
   });
 
   it('encrypts & decrypts strings between mailboxes', async () => {

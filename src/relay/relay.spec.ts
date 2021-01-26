@@ -19,8 +19,8 @@ describe('Relay', () => {
     if (!aliceKey || !bobKey) {
       throw new Error('error');
     }
-    await Alice.keyRing?.addGuest('Bob', bobKey);
-    await Bob.keyRing?.addGuest('Alice', aliceKey);
+    await Alice.keyRing.addGuest('Bob', bobKey);
+    await Bob.keyRing.addGuest('Alice', aliceKey);
   });
 
   it('send a message', async () => {

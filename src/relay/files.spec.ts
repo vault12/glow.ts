@@ -25,11 +25,8 @@ describe('Relay / File transfer', () => {
     Bob = await Mailbox.new('Bob');
     const aliceKey = Alice.getPubCommKey();
     const bobKey = Bob.getPubCommKey();
-    if (!aliceKey || !bobKey) {
-      throw new Error('error');
-    }
-    await Alice.keyRing?.addGuest('Bob', bobKey);
-    await Bob.keyRing?.addGuest('Alice', aliceKey);
+    await Alice.keyRing.addGuest('Bob', bobKey);
+    await Bob.keyRing.addGuest('Alice', aliceKey);
 
     file = fs.readFileSync('.test.zip');
     expect(file.length).toBe(765);
