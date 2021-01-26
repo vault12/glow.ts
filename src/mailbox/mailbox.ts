@@ -84,17 +84,11 @@ export class Mailbox {
       throw new Error(`encodeMessage: don't know guest ${guest}`);
     }
 
-    let privateKey;
-    privateKey = this.keyRing.commKey?.privateKey;
-    if (!privateKey) {
-      throw new Error('encodeMessage: no comm key');
-    }
+    let privateKey = this.keyRing.commKey.privateKey;
 
-    if (session) {
-      privateKey = this.sessionKeys.get(guest)?.privateKey;
-    }
-    if (!privateKey) {
-      throw new Error('encodeMessage: no comm key');
+    const sessionKey = this.sessionKeys.get(guest);
+    if (session && sessionKey) {
+      privateKey = sessionKey.privateKey;
     }
 
     if (!(message instanceof Uint8Array)) {
@@ -119,16 +113,11 @@ export class Mailbox {
       throw new Error(`decodeMessage: don't know guest ${guest}`);
     }
 
-    let privateKey = this.keyRing.commKey?.privateKey;
-    if (!privateKey) {
-      throw new Error('decodeMessage: no comm key');
-    }
+    let privateKey = this.keyRing.commKey.privateKey;
 
-    if (session) {
-      privateKey = this.sessionKeys.get(guest)?.privateKey;
-    }
-    if (!privateKey) {
-      throw new Error('decodeMessage: no comm key');
+    const sessionKey = this.sessionKeys.get(guest);
+    if (session && sessionKey) {
+      privateKey = sessionKey.privateKey;
     }
 
     if (!(nonce instanceof Uint8Array)) {
