@@ -175,11 +175,11 @@ export class Mailbox {
   async upload(relay: Relay, guestKey: string, message: any) {
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
-      throw new Error(`relaySend: don't know guest ${guestKey}`);
+      throw new Error(`upload: don't know guest ${guestKey}`);
     }
 
     const encodedMessage = await this.encodeMessage(guestKey, message);
-    const toHpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
+    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
 
     const token = await relay.runCmd('upload', this, {
       to: Utils.toBase64(toHpk),
@@ -225,7 +225,7 @@ export class Mailbox {
         throw new Error('download - unknown message type');
       }
     }
-    console.log(messages);
+
     return messages;
   }
 
@@ -255,7 +255,7 @@ export class Mailbox {
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
     }
-    const toHpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
+    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
 
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
     metadata.skey = Utils.toBase64(secretKey);

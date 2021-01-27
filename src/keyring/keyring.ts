@@ -74,7 +74,7 @@ export class KeyRing {
   }
 
   async getHpk(): Promise<string> {
-    const hpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(this.commKey.publicKey)));
+    const hpk = await this.nacl.h2(Utils.fromBase64(this.commKey.publicKey));
     return Utils.toBase64(hpk);
   }
 
@@ -158,7 +158,7 @@ export class KeyRing {
   }
 
   private async processGuest(guestTag: string, publicKey: Base64, isTemporary?: boolean): Promise<string> {
-    const b64_h2 = Utils.toBase64(await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(publicKey))));
+    const b64_h2 = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(publicKey)));
     this.guestKeys.set(guestTag, {
       pk: publicKey,
       hpk: b64_h2,

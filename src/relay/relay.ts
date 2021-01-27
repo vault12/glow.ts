@@ -72,15 +72,14 @@ export class Relay {
     if (!this.clientToken || !this.relayToken) {
       throw new Error('No token');
     }
-    const clientTokenString = Utils.decode_latin1(this.clientToken);
     // After clientToken is sent to the relay, we use only h2() of it
-    const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
+    const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
     const handshake = new Uint8Array([...this.clientToken, ...this.relayToken]);
 
     let sessionHandshake: Uint8Array;
 
     if (this.diff === 0) {
-      sessionHandshake = await this.nacl.h2(Utils.decode_latin1(handshake));
+      sessionHandshake = await this.nacl.h2(handshake);
     } else {
       sessionHandshake = await this.ensureNonceDiff(handshake);
     }
@@ -110,7 +109,7 @@ export class Relay {
     //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
     const signature = new Uint8Array([...clientTempPk, ...this.relayToken, ...this.clientToken]);
 
-    const h2Signature = await this.nacl.h2(Utils.decode_latin1(signature));
+    const h2Signature = await this.nacl.h2(signature);
     const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
     const payload = {
       pub_key: mbx.keyRing.getPubCommKey(),
@@ -119,8 +118,7 @@ export class Relay {
     };
 
     const outer = await mbx.encodeMessage(this.relayId(), payload, true);
-    const clientTokenString = Utils.decode_latin1(this.clientToken);
-    const h2ClientToken = Utils.toBase64(await this.nacl.h2(clientTokenString));
+    const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
     await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
       Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
     return this.relayId();
@@ -228,7 +226,7 @@ export class Relay {
     let h2;
     do {
       nonce = await this.nacl.random_bytes(32);
-      h2 = await this.nacl.h2(Utils.decode_latin1(new Uint8Array([...handshake, ...nonce])));
+      h2 = await this.nacl.h2(new Uint8Array([...handshake, ...nonce]));
     } while (!this.arrayZeroBits(h2, this.diff));
 
     return nonce;

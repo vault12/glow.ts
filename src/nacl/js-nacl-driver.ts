@@ -122,11 +122,14 @@ export class JsNaClDriver implements NaClDriver {
    * Zero out initial sha256 block, and double hash 0-padded message
    * http://cs.nyu.edu/~dodis/ps/h-of-h.pdf
    */
-  async h2(data: string): Promise<Uint8Array> {
-    const source = await this.encode_latin1(data);
-    const extendedSource = new Uint8Array(64 + source.length);
+  async h2(data: string | Uint8Array): Promise<Uint8Array> {
+    if (!(data instanceof Uint8Array)) {
+      data = await this.encode_latin1(data);
+    }
+
+    const extendedSource = new Uint8Array(64 + data.length);
     extendedSource.fill(0);
-    extendedSource.set(source, 64);
+    extendedSource.set(data, 64);
     return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
   }
 }
