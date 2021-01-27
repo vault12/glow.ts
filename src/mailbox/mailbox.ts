@@ -5,6 +5,17 @@ import { Base64, Utils } from '../utils/utils';
 import { Relay } from '../relay/relay';
 import { Keys } from '../keys/keys';
 
+interface ZaxMessage {
+  data?: Base64;
+  time: number;
+  from: Base64;
+  fromTag?: string;
+  nonce: Base64;
+  ctext?: Base64;
+  kind: 'message' | 'file';
+  msg?: any;
+}
+
 /**
  * Low-level operations with Zax relay.
  */
@@ -184,8 +195,38 @@ export class Mailbox {
     };
   }
 
-  async download(relay: Relay) {
-    return await relay.runCmd('download', this);
+  /**
+   * Downloads messages from a relay and decrypts the contents.
+   */
+  async download(relay: Relay): Promise<ZaxMessage[]> {
+    const messages: ZaxMessage[] = await relay.runCmd('download', this);
+
+    for (const msg of messages) {
+      const tag = this.keyRing.getTagByHpk(msg.from);
+      if (!tag) {
+        continue;
+      }
+
+      msg.fromTag = tag;
+
+      if (msg.kind === 'message' && msg.data) {
+        const originalMsg = await this.decodeMessage(tag, msg.nonce, msg.data);
+        if (originalMsg) {
+          msg.msg = originalMsg;
+          delete msg.data;
+        }
+      } else if (msg.kind === 'file' && msg.data) {
+        const data = JSON.parse(msg.data);
+        const originalMsg = await this.decodeMessage(tag, msg.nonce, data.ctext);
+        originalMsg.uploadID = data.uploadID;
+        msg.msg = originalMsg;
+        delete msg.data;
+      } else {
+        throw new Error('download - unknown message type');
+      }
+    }
+    console.log(messages);
+    return messages;
   }
 
   /**
@@ -196,7 +237,8 @@ export class Mailbox {
   }
 
   /**
-  * Deletes messages from a relay that match base64 nonces, and returns the number of remaining messages.
+  * Deletes messages from a relay given a list of base64 message nonces,
+  * and returns the number of remaining messages.
   */
   async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
     return await relay.runCmd('delete', this, { payload: nonceList });
@@ -249,24 +291,10 @@ export class Mailbox {
   }
 
   async getFileMetadata(relay: Relay, uploadID: string) {
-    let sender;
-    let message;
-    const all: any[] = await this.download(relay);
-    const mapped = all.find(encryptedMessage => {
-      sender = this.keyRing.getTagByHpk(encryptedMessage.from);
-      if (sender && encryptedMessage.kind === 'file') {
-        message = JSON.parse(encryptedMessage.data);
-        encryptedMessage.ctext = message.ctext;
-        return message.uploadID === uploadID;
-      }
-    });
-
-    if (sender) {
-      const originalMessage = await this.decodeMessage(sender, mapped.nonce, mapped.ctext);
-      return originalMessage;
-    }
-
-    return null;
+    const messages = await this.download(relay);
+    const fileMessage = messages
+      .find(encryptedMessage => encryptedMessage.msg.uploadID === uploadID);
+    return fileMessage?.msg;
   }
 
   async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array) {

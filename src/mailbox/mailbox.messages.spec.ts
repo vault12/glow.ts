@@ -24,7 +24,7 @@ describe('Relay', () => {
   });
 
   it('send a message', async () => {
-    const stat = await Alice.upload(testRelay, 'Bob', 'message');
+    const stat = await Alice.upload(testRelay, 'Bob', 'some message');
     expect(stat.token.length).toBeGreaterThan(0);
     nonce = stat.nonce;
     token = stat.token;
@@ -39,9 +39,9 @@ describe('Relay', () => {
 
   it('download Bob mailbox', async () => {
     const downloaded = await Bob.download(testRelay);
-    const encodedMessage = downloaded[0];
-    const msg = await Bob.decodeMessage('Alice', encodedMessage.nonce, encodedMessage.data);
-    expect(msg).toBe('message');
+    const message = downloaded[0];
+    console.log(message);
+    expect(message.msg).toBe('some message');
   });
 
   it('delete from Bob mailbox', async () => {
