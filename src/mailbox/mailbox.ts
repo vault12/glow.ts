@@ -182,10 +182,11 @@ export class Mailbox {
     const payload = await this.encodeMessage(guestKey, message);
     const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
 
-    const token = await relay.runCmd('upload', this, {
+    const response = await relay.runCmd('upload', this, {
       to: Utils.toBase64(toHpk),
       payload
     });
+    const token = response[0];
     return {
       token,
       nonce: payload.nonce,
@@ -197,7 +198,8 @@ export class Mailbox {
    * Downloads messages from a relay and decrypts the contents.
    */
   async download(relay: Relay): Promise<ZaxMessage[]> {
-    const messages: ZaxMessage[] = await relay.runCmd('download', this);
+    const response = await relay.runCmd('download', this);
+    const messages: ZaxMessage[] = await this.decryptResponse(relay, response);
 
     for (const msg of messages) {
       const tag = this.keyRing.getTagByHpk(msg.from);
@@ -231,7 +233,8 @@ export class Mailbox {
    * Returns the number of messages in the mailbox on a given relay.
    */
   async count(relay: Relay): Promise<number> {
-    return await relay.runCmd('count', this);
+    const response = await relay.runCmd('count', this);
+    return await this.decryptResponse(relay, response);
   }
 
   /**
@@ -239,11 +242,13 @@ export class Mailbox {
   * and returns the number of remaining messages.
   */
   async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
-    return await relay.runCmd('delete', this, { payload: nonceList });
+    const response = await relay.runCmd('delete', this, { payload: nonceList });
+    return parseInt(response[0], 10);
   }
 
   async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
-    return await relay.runCmd('messageStatus', this, { token: storageToken });
+    const response = await relay.runCmd('messageStatus', this, { token: storageToken });
+    return parseInt(response[0], 10);
   }
 
   // ------------------------------ Relay file commands (public API) ------------------------------
@@ -265,23 +270,27 @@ export class Mailbox {
       file_size: rawMetadata.orig_size,
       metadata
     });
-    response.skey = secretKey;
-    return response;
+
+    const decrypted = await this.decryptResponse(relay, response);
+    decrypted.skey = secretKey;
+    return decrypted;
   }
 
   async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array) {
     const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
-    return await relay.runCmd('uploadFileChunk', this, {
+    const response = await relay.runCmd('uploadFileChunk', this, {
       uploadID,
       part,
       last_chunk: (totalParts - 1 === part),
       nonce: encodedChunk.nonce
     }, encodedChunk.ctext);
+    return await this.decryptResponse(relay, response);
   }
 
-  async getFileStatus(relay: Relay, uploadID: string) {
-    return await relay.runCmd('fileStatus', this, { uploadID });
+  async getFileStatus(relay: Relay, uploadID: string): Promise<string> {
+    const response = await relay.runCmd('fileStatus', this, { uploadID });
+    return await this.decryptResponse(relay, response);
   }
 
   async getFileMetadata(relay: Relay, uploadID: string) {
@@ -298,8 +307,15 @@ export class Mailbox {
     return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
-  async deleteFile(relay: Relay, uploadID: string) {
-    return await relay.runCmd('deleteFile', this, { uploadID });
+  async deleteFile(relay: Relay, uploadID: string): Promise<string> {
+    const response = await relay.runCmd('deleteFile', this, { uploadID });
+    return await this.decryptResponse(relay, response);
+  }
+
+  private async decryptResponse(relay: Relay, response: string[]) {
+    const [nonce, ctext] = response;
+    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
+    return decoded;
   }
 
   // ------------------------------ Nonce helpers ------------------------------
