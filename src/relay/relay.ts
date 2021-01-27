@@ -32,7 +32,9 @@ export class Relay {
 
   // ------------------------------ Connection initialization ------------------------------
 
-  // exchange tokens with a relay and get a temp session key for this relay
+  /**
+   * Exchange tokens with a relay and get a temp session key for this relay
+   */
   async openConnection(): Promise<void> {
     await this.getServerToken();
     await this.getServerKey();
@@ -124,34 +126,21 @@ export class Relay {
     return this.relayId();
   }
 
-  async runCmd(command: string, mailbox: Mailbox, params?: any) {
+  async runCmd(command: string, mailbox: Mailbox, params?: any, ctext?: string) {
     if (!Relay.relayCommands.includes(command)) {
       throw new Error(`Relay ${this.url} doesn't support command ${command}`);
     }
 
     params = { cmd: command, ...params };
-
-    let ctext;
     const mbxHpk = await mailbox.getHpk();
-
-    if (command === 'uploadFileChunk') {
-      ctext = params.ctext;
-      delete params.ctext;
-    }
     const message = await mailbox.encodeMessage(this.relayId(), params, true);
-    let response;
-    if (command === 'uploadFileChunk') {
-      response = await this.httpCall('command', mbxHpk,
-        Utils.toBase64(message.nonce), Utils.toBase64(message.ctext), ctext);
-    } else {
-      response = await this.httpCall('command', mbxHpk,
-        Utils.toBase64(message.nonce), Utils.toBase64(message.ctext));
+
+    const payload = [mbxHpk, Utils.toBase64(message.nonce), Utils.toBase64(message.ctext)];
+    if (ctext) {
+      payload.push(ctext);
     }
 
-    if (!response) {
-      throw new Error(`${this.url} - ${command} error; empty response`);
-    }
-
+    const response = await this.httpCall('command', ...payload);
     return await this.processResponse(response, mailbox, command, params);
   }
 
@@ -185,6 +174,10 @@ export class Relay {
   }
 
   private async processResponse(rawResponse: string, mailbox: Mailbox, command: string, params: any) {
+    if (!rawResponse) {
+      throw new Error(`${this.url} - ${command} error; empty response`);
+    }
+
     const response = this.splitString(String(rawResponse));
 
     if (command === 'delete') {
@@ -241,13 +234,16 @@ export class Relay {
     return nonce;
   }
 
-  // check whether the rightmost difficulty bits of an Uint8Array are 0, where
-  // the lowest indexes of the array represent those rightmost bits. Thus if
-  // the difficulty is 17, then array[0] and array[1] should be 0, as should the
-  // rightmost bit of array[2]. This is used for our difficulty settings in Zax to
-  // reduce burden on a busy server by ensuring clients have to do some
-  // additional work during the session handshake
-  private arrayZeroBits(array: Uint8Array, difficulty: number) {
+  /**
+   * Returns `true` if the rightmost n bits of a byte are 0.
+   * Check whether the rightmost difficulty bits of an Uint8Array are 0, where
+   * the lowest indexes of the array represent those rightmost bits. Thus if
+   * the difficulty is 17, then array[0] and array[1] should be 0, as should the
+   * rightmost bit of array[2]. This is used for our difficulty settings in Zax to
+   * reduce burden on a busy server by ensuring clients have to do some
+   * additional work during the session handshake.
+   */
+  private arrayZeroBits(array: Uint8Array, difficulty: number): boolean {
     let byte;
     let n = difficulty;
     for (let i = 0; i <= (1 + difficulty / 8); i++) {
@@ -267,7 +263,9 @@ export class Relay {
     return false;
   }
 
-  // returns `true` if the rightmost n bits of a byte are 0
+  /**
+   * Returns `true` if the rightmost n bits of a byte are 0
+   */
   private firstZeroBits(byte: number, n: number): boolean {
     return byte === ((byte >> n) << n);
   }

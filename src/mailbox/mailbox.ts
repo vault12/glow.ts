@@ -161,13 +161,13 @@ export class Mailbox {
 
   // ------------------------------ Relay message commands (public API) ------------------------------
 
-  async upload(relay: Relay, guest: string, message: any) {
-    const guestPk = this.keyRing.getGuestKey(guest);
+  async upload(relay: Relay, guestKey: string, message: any) {
+    const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
-      throw new Error(`relaySend: don't know guest ${guest}`);
+      throw new Error(`relaySend: don't know guest ${guestKey}`);
     }
 
-    const encodedMessage = await this.encodeMessage(guest, message);
+    const encodedMessage = await this.encodeMessage(guestKey, message);
     const toHpk = await this.nacl.h2(Utils.decode_latin1(Utils.fromBase64(guestPk)));
 
     const token = await relay.runCmd('upload', this, {
@@ -188,11 +188,17 @@ export class Mailbox {
     return await relay.runCmd('download', this);
   }
 
+  /**
+   * Returns the number of messages in the mailbox on a given relay.
+   */
   async count(relay: Relay): Promise<number> {
     return await relay.runCmd('count', this);
   }
 
-  async delete(relay: Relay, nonceList: string[]): Promise<number> {
+  /**
+  * Deletes messages from a relay that match base64 nonces, and returns the number of remaining messages.
+  */
+  async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
     return await relay.runCmd('delete', this, { payload: nonceList });
   }
 
@@ -234,9 +240,8 @@ export class Mailbox {
       uploadID,
       part,
       last_chunk: (totalParts - 1 === part),
-      nonce: encodedChunk.nonce,
-      ctext: encodedChunk.ctext
-    });
+      nonce: encodedChunk.nonce
+    }, encodedChunk.ctext);
   }
 
   async getFileStatus(relay: Relay, uploadID: string) {
