@@ -16,6 +16,11 @@ interface ZaxMessage {
   msg?: any;
 }
 
+interface EncryptedMessage {
+  nonce: Base64;
+  ctext: Base64;
+}
+
 /**
  * Low-level operations with Zax relay.
  */
@@ -89,7 +94,7 @@ export class Mailbox {
   // added to our keyring. If the session flag is set, we will look for keys in
   // temporary, not the persistent collection of session keys. skTag lets you
   // specifiy the secret key in a key ring
-  async encodeMessage(guest: string, message: any, session = false, skTag = null) {
+  async encodeMessage(guest: string, message: any, session = false, skTag = null): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`encodeMessage: don't know guest ${guest}`);
@@ -111,14 +116,17 @@ export class Mailbox {
     return await this.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
-  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array, skFrom: Uint8Array, nonceData?: number) {
+  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
+    skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
     const nonce = await this.makeNonce(nonceData);
     const ctext = await this.nacl.crypto_box(message, nonce, pkTo, skFrom);
-    return { nonce, ctext };
+    return {
+      nonce: Utils.toBase64(nonce),
+      ctext: Utils.toBase64(ctext)
+    };
   }
 
-  async decodeMessage(guest: string, nonce: Uint8Array | Base64, ctext: Uint8Array | Base64,
-    session = false, skTag = null) {
+  async decodeMessage(guest: string, nonce: Base64, ctext: Base64, session = false, skTag = null) {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`decodeMessage: don't know guest ${guest}`);
@@ -131,15 +139,8 @@ export class Mailbox {
       privateKey = sessionKey.privateKey;
     }
 
-    if (!(nonce instanceof Uint8Array)) {
-      nonce = Utils.fromBase64(nonce);
-    }
-
-    if (!(ctext instanceof Uint8Array)) {
-      ctext = Utils.fromBase64(ctext);
-    }
-
-    return await this.rawDecodeMessage(nonce, ctext, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    return await this.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+      Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array) {
@@ -178,20 +179,17 @@ export class Mailbox {
       throw new Error(`upload: don't know guest ${guestKey}`);
     }
 
-    const encodedMessage = await this.encodeMessage(guestKey, message);
+    const payload = await this.encodeMessage(guestKey, message);
     const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
 
     const token = await relay.runCmd('upload', this, {
       to: Utils.toBase64(toHpk),
-      payload: {
-        nonce: Utils.toBase64(encodedMessage.nonce),
-        ctext: Utils.toBase64(encodedMessage.ctext),
-      }
+      payload
     });
     return {
       token,
-      nonce: Utils.toBase64(encodedMessage.nonce),
-      ctext: Utils.toBase64(encodedMessage.ctext)
+      nonce: payload.nonce,
+      ctext: payload.ctext
     };
   }
 
@@ -250,7 +248,7 @@ export class Mailbox {
 
   // ------------------------------ Relay file commands (public API) ------------------------------
 
-  async startFileUpload(guest: string, relay: Relay, metadata: any) {
+  async startFileUpload(guest: string, relay: Relay, rawMetadata: any) {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
@@ -258,18 +256,14 @@ export class Mailbox {
     const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
 
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
-    metadata.skey = Utils.toBase64(secretKey);
+    rawMetadata.skey = Utils.toBase64(secretKey);
 
-    const encodedMetadata = await this.encodeMessage(guest, metadata);
-    await this.connectToRelay(relay);
-    const fileSize = metadata.orig_size;
+    const metadata = await this.encodeMessage(guest, rawMetadata);
+
     const response = await relay.runCmd('startFileUpload', this, {
       to: Utils.toBase64(toHpk),
-      file_size: fileSize,
-      metadata: {
-        nonce: Utils.toBase64(encodedMetadata.nonce),
-        ctext: Utils.toBase64(encodedMetadata.ctext)
-      }
+      file_size: rawMetadata.orig_size,
+      metadata
     });
     response.skey = secretKey;
     return response;

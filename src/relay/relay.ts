@@ -113,14 +113,14 @@ export class Relay {
     const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
     const payload = {
       pub_key: mbx.keyRing.getPubCommKey(),
-      nonce: Utils.toBase64(inner.nonce),
-      ctext: Utils.toBase64(inner.ctext)
+      nonce: inner.nonce,
+      ctext: inner.ctext
     };
 
     const outer = await mbx.encodeMessage(this.relayId(), payload, true);
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
     await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
-      Utils.toBase64(outer.nonce), Utils.toBase64(outer.ctext));
+      outer.nonce, outer.ctext);
     return this.relayId();
   }
 
@@ -133,7 +133,7 @@ export class Relay {
     const mbxHpk = await mailbox.getHpk();
     const message = await mailbox.encodeMessage(this.relayId(), params, true);
 
-    const payload = [mbxHpk, Utils.toBase64(message.nonce), Utils.toBase64(message.ctext)];
+    const payload = [mbxHpk, message.nonce, message.ctext];
     if (ctext) {
       payload.push(ctext);
     }
@@ -202,8 +202,7 @@ export class Relay {
       }
       const nonce = response[0];
       const ctext = response[1];
-      const decoded = await mailbox.decodeMessage(this.relayId(),
-        Utils.fromBase64(nonce), Utils.fromBase64(ctext), true);
+      const decoded = await mailbox.decodeMessage(this.relayId(), nonce, ctext, true);
       decoded.ctext = response[2];
       return decoded;
     }
@@ -214,8 +213,7 @@ export class Relay {
 
     const nonce = response[0];
     const ctext = response[1];
-    const decoded = await mailbox.decodeMessage(this.relayId(),
-      Utils.fromBase64(nonce), Utils.fromBase64(ctext), true);
+    const decoded = await mailbox.decodeMessage(this.relayId(), nonce, ctext, true);
     return decoded;
   }
 

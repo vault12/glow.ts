@@ -28,6 +28,8 @@ describe('Relay / File transfer', () => {
     await Alice.keyRing.addGuest('Bob', bobKey);
     await Bob.keyRing.addGuest('Alice', aliceKey);
 
+    await Alice.connectToRelay(testRelay);
+
     file = fs.readFileSync('.test.zip');
     expect(file.length).toBe(765);
 

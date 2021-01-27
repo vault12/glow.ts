@@ -40,7 +40,6 @@ describe('Relay', () => {
   it('download Bob mailbox', async () => {
     const downloaded = await Bob.download(testRelay);
     const message = downloaded[0];
-    console.log(message);
     expect(message.msg).toBe('some message');
   });
 
