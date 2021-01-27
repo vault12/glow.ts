@@ -20,9 +20,9 @@ export class Relay {
     'getEntropy'];
 
   private nacl: NaClDriver;
+  private diff: number;
   private clientToken?: Uint8Array;
   private relayToken?: Uint8Array;
-  private diff: number;
   private relayPublicKey?: string;
 
   constructor(public url: string) {
@@ -139,7 +139,7 @@ export class Relay {
     }
 
     const response = await this.httpCall('command', ...payload);
-    return await this.processResponse(response, mailbox, command, params);
+    return await this.processResponse(response, mailbox, command);
   }
 
   // ------------------------------ Low-level server request handling ------------------------------
@@ -171,16 +171,12 @@ export class Relay {
     return response;
   }
 
-  private async processResponse(rawResponse: string, mailbox: Mailbox, command: string, params: any) {
+  private async processResponse(rawResponse: string, mailbox: Mailbox, command: string) {
     if (!rawResponse) {
       throw new Error(`${this.url} - ${command} error; empty response`);
     }
 
     const response = this.splitString(String(rawResponse));
-
-    if (command === 'delete') {
-      return JSON.parse(rawResponse);
-    }
 
     if (command === 'upload') {
       if (response.length !== 1 || response[0].length !== config.RELAY_TOKEN_B64) {
@@ -189,7 +185,7 @@ export class Relay {
       return rawResponse;
     }
 
-    if (command === 'messageStatus') {
+    if (command === 'messageStatus' || command === 'delete') {
       if (response.length !== 1) {
         throw new Error(`${this.url} - ${command}: Bad response`);
       }
@@ -200,19 +196,14 @@ export class Relay {
       if (response.length !== 3) {
         throw new Error(`${this.url} - ${command}: Bad response`);
       }
-      const nonce = response[0];
-      const ctext = response[1];
-      const decoded = await mailbox.decodeMessage(this.relayId(), nonce, ctext, true);
-      decoded.ctext = response[2];
-      return decoded;
+      return response;
     }
 
     if (response.length !== 2) {
       throw new Error(`${this.url} - ${command}: Bad response`);
     }
 
-    const nonce = response[0];
-    const ctext = response[1];
+    const [nonce, ctext] = response;
     const decoded = await mailbox.decodeMessage(this.relayId(), nonce, ctext, true);
     return decoded;
   }

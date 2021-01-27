@@ -162,8 +162,8 @@ export class Mailbox {
     };
   }
 
-  async decodeMessageSymmetric(nonce: Uint8Array, ctext: Uint8Array, secretKey: Uint8Array) {
-    return await this.nacl.crypto_secretbox_open(ctext, nonce, secretKey);
+  async decodeMessageSymmetric(nonce: Base64, ctext: Base64, secretKey: Uint8Array) {
+    return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
 
   async connectToRelay(relay: Relay) {
@@ -292,9 +292,10 @@ export class Mailbox {
   }
 
   async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array) {
-    const encodedChunk = await relay.runCmd('downloadFileChunk', this, { uploadID, part });
-    return await this.decodeMessageSymmetric(Utils.fromBase64(encodedChunk.nonce),
-      Utils.fromBase64(encodedChunk.ctext), skey);
+    const response = await relay.runCmd('downloadFileChunk', this, { uploadID, part });
+    const [nonce, ctext, fileCtext] = response;
+    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
+    return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
   async deleteFile(relay: Relay, uploadID: string) {
