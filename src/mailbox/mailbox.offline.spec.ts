@@ -2,7 +2,7 @@ import { Mailbox } from './mailbox';
 import { NaCl } from '../nacl/nacl';
 import { Utils } from '../utils/utils';
 
-describe('Mailbox', () => {
+describe('Mailbox offline tests', () => {
   let Alice: Mailbox;
   let Bob: Mailbox;
 

@@ -1,6 +1,6 @@
-import { Relay } from './relay';
+import { Relay } from '../relay/relay';
 import { NaCl } from '../nacl/nacl';
-import { Mailbox } from '../mailbox/mailbox';
+import { Mailbox } from './mailbox';
 import { randomNumber } from './tests.helper';
 import fs from 'fs';
 
