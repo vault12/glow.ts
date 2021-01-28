@@ -12,23 +12,23 @@ export interface EncryptedMessage {
 }
 
 /**
- * Low-level operations with Zax relay.
+ * Low-level operations with Zax relay
  */
 export class Relay {
-  // plugins can add their own commands to specific relays
+  // Plugins can add their own commands to specific relays
   static readonly relayCommands = [
-    //message commands
+    // Message commands
     'count', 'upload', 'download', 'messageStatus', 'delete',
-    // file commands
+    // File commands
     'startFileUpload', 'uploadFileChunk', 'downloadFileChunk', 'fileStatus', 'deleteFile',
-    // reserved for future use
+    // Reserved for future use
     'getEntropy'];
 
   private nacl: NaClDriver;
   private diff: number;
   private clientToken?: Uint8Array;
   private relayToken?: Uint8Array;
-  private relayPublicKey?: string;
+  private relayPublicKey?: Base64;
 
   constructor(public url: string) {
     this.nacl = NaCl.getInstance();
@@ -38,62 +38,63 @@ export class Relay {
   // ------------------------------ Connection initialization ------------------------------
 
   /**
-   * Exchange tokens with a relay and get a temp session key for this relay
+   * Exchanges tokens with a relay and gets a temp session key for this relay
    */
   async openConnection(): Promise<void> {
-    await this.getServerToken();
-    await this.getServerKey();
+    await this.getRelayToken();
+    await this.getRelayKey();
   }
 
-  private async getServerToken(): Promise<void> {
+  /**
+   * Sends a client token to a relay and saves a relay token
+   */
+  private async getRelayToken(): Promise<void> {
     // Generate a client token. It will be used as part of handshake id with relay
     if (!this.clientToken) {
       this.clientToken = await this.nacl.random_bytes(config.RELAY_TOKEN_LEN);
     }
-    // sanity check the client token
-    if (this.clientToken.length !== config.RELAY_TOKEN_LEN) {
-      throw new Error(`[Relay] Client token must be ${config.RELAY_TOKEN_LEN} bytes`);
-    }
 
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
-    if (!data) {
-      throw new Error(`[Relay] ${this.url} - start_session error; empty response`);
-    }
 
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
-    const lines = this.splitString(data);
-    this.relayToken = Utils.fromBase64(lines[0]);
-    if (lines.length !== 2) {
-      throw new Error(`Wrong start_session from ${this.url}`);
-    }
-    this.diff = parseInt(lines[1], 10);
+    const [token, diff] = this.splitResponse(data, 2, 'start_session');
+    this.relayToken = Utils.fromBase64(token);
+    this.diff = parseInt(diff, 10);
 
     if (this.diff > 10) {
-      console.log(`Relay ${this.url} requested difficulty ${this.diff}. Session handshake may take longer.`);
+      console.log(`[Relay] ${this.url} requested difficulty ${this.diff}. Session handshake may take longer.`);
     }
   }
 
-  async getServerKey(): Promise<void> {
+  /**
+   * Complete the handshake
+   */
+  async getRelayKey(): Promise<void> {
     if (!this.clientToken || !this.relayToken) {
-      throw new Error('No token');
+      throw new Error('[Relay] No tokens found, fetch them from the relay first');
     }
     // After clientToken is sent to the relay, we use only h2() of it
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
-    const handshake = new Uint8Array([...this.clientToken, ...this.relayToken]);
 
+    const handshake = new Uint8Array([...this.clientToken, ...this.relayToken]);
     let sessionHandshake: Uint8Array;
 
+    // Compute session handshake based on difficulty level set by the server
     if (this.diff === 0) {
       sessionHandshake = await this.nacl.h2(handshake);
     } else {
       sessionHandshake = await this.ensureNonceDiff(handshake);
     }
 
-    // relay gives us back temp session key masked by clientToken we started with
+    // We confirm handshake by sending back h2(clientToken, relay_token)
     const relayPk = await this.httpCall('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
+    // Relay gives us back temp session key masked by clientToken we started with
     this.relayPublicKey = relayPk;
   }
 
+  /**
+   * Returns an ID for a relay (for encryption purposes)
+   */
   relayId(): string {
     return `relay_#${this.url}`;
   }
@@ -129,22 +130,29 @@ export class Relay {
     return this.relayId();
   }
 
+  /**
+   * Executes a message/file command on a relay, parses and validates the response
+   */
   async runCmd(command: string, hpk: Base64, message: EncryptedMessage, ctext?: string): Promise<string[]> {
     if (!Relay.relayCommands.includes(command)) {
       throw new Error(`[Relay] ${this.url} doesn't support command ${command}`);
     }
 
     const payload = [hpk, message.nonce, message.ctext];
+    // if we are sending symmetrically encrypted ctext, it goes on the next line in the payload
     if (ctext) {
       payload.push(ctext);
     }
 
     const response = await this.httpCall('command', ...payload);
-    return await this.processResponse(command, response);
+    return await this.validateResponse(command, response);
   }
 
   // ------------------------------ Low-level server request handling ------------------------------
 
+  /**
+   * Executes a call to a relay and return raw string response
+   */
   private async httpCall(command: string, ...params: string[]): Promise<string> {
     axios.defaults.adapter = require('axios/lib/adapters/http');
 
@@ -164,42 +172,42 @@ export class Relay {
     return String(response.data);
   }
 
-  private splitString(rawResponse: string): string[] {
+  /**
+   * Parses relay response and throws an error if its format is unexpected
+   */
+  private splitResponse(rawResponse: string, expectedLines: number, command: string): string[] {
     let response = rawResponse.split('\r\n');
     if (response.length < 2) {
       response = rawResponse.split('\n');
     }
+
+    if (!rawResponse || (expectedLines && expectedLines !== response.length)) {
+      throw new Error(`[Relay] ${this.url} - ${command}: Bad response`);
+    }
     return response;
   }
 
-  private async processResponse(command: string, rawResponse: string): Promise<string[]> {
-    if (!rawResponse) {
-      throw new Error(`${this.url} - ${command} error; empty response`);
+  /**
+   * Compares the expected command response with what was actually received from a relay
+   */
+  private async validateResponse(command: string, rawResponse: string): Promise<string[]> {
+    switch (command) {
+      case 'upload':
+      case 'messageStatus':
+      case 'delete':
+        return this.splitResponse(rawResponse, 1, command);
+      case 'downloadFileChunk':
+        return this.splitResponse(rawResponse, 3, command);
+      default:
+        return this.splitResponse(rawResponse, 2, command);
     }
-
-    const response = this.splitString(String(rawResponse));
-
-    if (command === 'upload') {
-      if (response.length !== 1 || response[0].length !== config.RELAY_TOKEN_B64) {
-        throw new Error(`${this.url} - ${command}: Bad response`);
-      }
-    } else if (command === 'messageStatus' || command === 'delete') {
-      if (response.length !== 1) {
-        throw new Error(`${this.url} - ${command}: Bad response`);
-      }
-    } else if (command === 'downloadFileChunk') {
-      if (response.length !== 3) {
-        throw new Error(`${this.url} - ${command}: Bad response`);
-      }
-    } else if (response.length !== 2) {
-      throw new Error(`${this.url} - ${command}: Bad response`);
-    }
-
-    return response;
   }
 
   // -------------------------------- Difficulty adjustment --------------------------------
 
+  /**
+   * Continuously calculates the nonce until one requested by a relay is found
+   */
   private async ensureNonceDiff(handshake: Uint8Array) {
     let nonce;
     let h2;
@@ -218,7 +226,7 @@ export class Relay {
    * the difficulty is 17, then array[0] and array[1] should be 0, as should the
    * rightmost bit of array[2]. This is used for our difficulty settings in Zax to
    * reduce burden on a busy server by ensuring clients have to do some
-   * additional work during the session handshake.
+   * additional work during the session handshake
    */
   private arrayZeroBits(array: Uint8Array, difficulty: number): boolean {
     let byte;

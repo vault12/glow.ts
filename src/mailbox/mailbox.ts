@@ -119,9 +119,9 @@ export class Mailbox {
     }
 
     const payload = await this.encodeMessage(guestKey, message);
-    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
+    const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
-    const response = await this.runRelayCommand(relay, 'upload', { to: Utils.toBase64(toHpk), payload });
+    const response = await this.runRelayCommand(relay, 'upload', { to: toHpk, payload });
     const token = response[0];
     return { token, nonce: payload.nonce };
   }
@@ -190,7 +190,7 @@ export class Mailbox {
     if (!guestPk) {
       throw new Error(`relaySend: don't know guest ${guest}`);
     }
-    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
+    const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
     rawMetadata.skey = Utils.toBase64(secretKey);
@@ -198,7 +198,7 @@ export class Mailbox {
     const metadata = await this.encodeMessage(guest, rawMetadata);
 
     const response = await this.runRelayCommand(relay, 'startFileUpload', {
-      to: Utils.toBase64(toHpk),
+      to: toHpk,
       file_size: rawMetadata.orig_size,
       metadata
     });
@@ -214,9 +214,9 @@ export class Mailbox {
     const response = await this.runRelayCommand(relay, 'uploadFileChunk', {
       uploadID,
       part,
-      last_chunk: (totalParts - 1 === part),
+      last_chunk: (totalParts - 1 === part), // marker of the last chunk, sent only once
       nonce: encodedChunk.nonce
-    }, encodedChunk.ctext);
+    }, encodedChunk.ctext); // do not encode file chunk contents, as it's already encoded with symmetric encryption
     return await this.decryptResponse(relay, response);
   }
 
