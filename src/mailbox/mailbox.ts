@@ -21,6 +21,26 @@ interface EncryptedMessage {
   ctext: Base64;
 }
 
+interface UploadedMessageData {
+  token: Base64;
+  nonce: Base64;
+}
+
+interface UploadFileChunkResponse {
+  status: string;
+}
+
+interface FileStatusResponse {
+  status: 'COMPLETE' | 'UPLOADING' | 'START' | 'NOT_FOUND';
+  total_chunks: number;
+  file_size: number;
+  bytes_stored: number;
+}
+
+interface DeleteFileResponse {
+  status: 'OK' | 'NOT_FOUND';
+}
+
 /**
  * Low-level operations with Zax relay.
  */
@@ -153,7 +173,7 @@ export class Mailbox {
     return data;
   }
 
-  async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array) {
+  async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array): Promise<EncryptedMessage> {
     const nonce = await this.makeNonce();
     const ctext = await this.nacl.crypto_secretbox(message, nonce, secretKey);
     return {
@@ -173,7 +193,7 @@ export class Mailbox {
 
   // ------------------------------ Relay message commands (public API) ------------------------------
 
-  async upload(relay: Relay, guestKey: string, message: any) {
+  async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
       throw new Error(`upload: don't know guest ${guestKey}`);
@@ -182,16 +202,9 @@ export class Mailbox {
     const payload = await this.encodeMessage(guestKey, message);
     const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
 
-    const response = await relay.runCmd('upload', this, {
-      to: Utils.toBase64(toHpk),
-      payload
-    });
+    const response = await relay.runCmd('upload', this, { to: Utils.toBase64(toHpk), payload });
     const token = response[0];
-    return {
-      token,
-      nonce: payload.nonce,
-      ctext: payload.ctext
-    };
+    return { token, nonce: payload.nonce };
   }
 
   /**
@@ -277,7 +290,7 @@ export class Mailbox {
   }
 
   async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
-    part: number, totalParts: number, skey: Uint8Array) {
+    part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
     const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
     const response = await relay.runCmd('uploadFileChunk', this, {
       uploadID,
@@ -288,7 +301,7 @@ export class Mailbox {
     return await this.decryptResponse(relay, response);
   }
 
-  async getFileStatus(relay: Relay, uploadID: string): Promise<string> {
+  async getFileStatus(relay: Relay, uploadID: string): Promise<FileStatusResponse> {
     const response = await relay.runCmd('fileStatus', this, { uploadID });
     return await this.decryptResponse(relay, response);
   }
@@ -300,14 +313,14 @@ export class Mailbox {
     return fileMessage?.msg;
   }
 
-  async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array) {
+  async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
     const response = await relay.runCmd('downloadFileChunk', this, { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
     const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
     return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
-  async deleteFile(relay: Relay, uploadID: string): Promise<string> {
+  async deleteFile(relay: Relay, uploadID: string): Promise<DeleteFileResponse> {
     const response = await relay.runCmd('deleteFile', this, { uploadID });
     return await this.decryptResponse(relay, response);
   }

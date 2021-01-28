@@ -24,6 +24,9 @@ describe('Relay', () => {
   });
 
   it('send a message', async () => {
+    const wrongRecipient = Alice.upload(testRelay, 'Carl', 'some message');
+    expect(wrongRecipient).rejects.toThrow(Error);
+
     const stat = await Alice.upload(testRelay, 'Bob', 'some message');
     expect(stat.token.length).toBeGreaterThan(0);
     nonce = stat.nonce;
