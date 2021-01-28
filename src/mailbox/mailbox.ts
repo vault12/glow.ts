@@ -105,9 +105,35 @@ export class Mailbox {
     return keys;
   }
 
-  async connectToRelay(relay: Relay) {
+  /**
+   * Adds a relay to mailbox keyring and fetches number of messages
+   */
+  async connectToRelay(relay: Relay): Promise<number> {
     await relay.openConnection();
-    await relay.connectMailbox(this);
+    if (!relay.relayPublicKey || !relay.clientToken || !relay.relayToken) {
+      throw new Error('[Mailbox] No relay tokens found, run openConnection() first');
+    }
+
+    const key = await this.createSessionKey(relay.relayId(), true);
+    const clientTempPk = Utils.fromBase64(key.publicKey);
+
+    await this.keyRing.addTempGuest(relay.relayId(), relay.relayPublicKey);
+    // Now it belongs to the mailbox
+    delete relay.relayPublicKey;
+
+    //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
+    const signature = new Uint8Array([...clientTempPk, ...relay.relayToken, ...relay.clientToken]);
+    const h2Signature = await this.nacl.h2(signature);
+    const encryptedSignature = await this.encodeMessage(relay.relayId(), h2Signature);
+
+    const payload = {
+      pub_key: this.keyRing.getPubCommKey(),
+      nonce: encryptedSignature.nonce,
+      ctext: encryptedSignature.ctext
+    };
+    const outer = await this.encodeMessage(relay.relayId(), payload, true);
+    const messagesNumber = await relay.prove(outer, key.publicKey);
+    return parseInt(messagesNumber, 10);
   }
 
   // ------------------------------ Relay message commands (public API) ------------------------------
@@ -314,7 +340,7 @@ export class Mailbox {
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
-  async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array) {
+  async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
     const data = await this.nacl.crypto_box_open(ctext, nonce, pkFrom, skTo);
     if (data) {
       const utf8 = await this.nacl.decode_utf8(data);
@@ -333,7 +359,7 @@ export class Mailbox {
     };
   }
 
-  async decodeMessageSymmetric(nonce: Base64, ctext: Base64, secretKey: Uint8Array) {
+  async decodeMessageSymmetric(nonce: Base64, ctext: Base64, secretKey: Uint8Array): Promise<Uint8Array | null> {
     return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
 

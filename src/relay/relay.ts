@@ -4,7 +4,6 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
-import { Mailbox } from '../mailbox/mailbox';
 
 export interface EncryptedMessage {
   nonce: Base64;
@@ -26,11 +25,12 @@ export class Relay {
 
   private nacl: NaClDriver;
   private diff: number;
-  private clientToken?: Uint8Array;
-  private relayToken?: Uint8Array;
-  private relayPublicKey?: Base64;
 
-  constructor(public url: string) {
+  constructor(
+    public url: string,
+    public clientToken?: Uint8Array,
+    public relayToken?: Uint8Array,
+    public relayPublicKey?: Base64) {
     this.nacl = NaCl.getInstance();
     this.diff = 0;
   }
@@ -42,7 +42,7 @@ export class Relay {
    */
   async openConnection(): Promise<void> {
     await this.getRelayToken();
-    await this.getRelayKey();
+    await this.getRelayPublicKey();
   }
 
   /**
@@ -69,7 +69,7 @@ export class Relay {
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  async getRelayKey(): Promise<void> {
+  async getRelayPublicKey(): Promise<void> {
     if (!this.clientToken || !this.relayToken) {
       throw new Error('[Relay] No tokens found, fetch them from the relay first');
     }
@@ -100,35 +100,14 @@ export class Relay {
   }
 
   /**
-   * Adds a relay to mailbox keyring and fetches number of messages
+   * Attaches a mailbox and fetches number of messages
    */
-  async connectMailbox(mbx: Mailbox): Promise<number> {
-    if (!this.relayPublicKey || !this.clientToken || !this.relayToken) {
-      throw new Error('[Relay] No tokens found, run openConnection() first');
+  async prove(payload: EncryptedMessage, publicKey: string): Promise<string> {
+    if (!this.clientToken) {
+      throw new Error('[Relay] No token found, run openConnection() first');
     }
-
-    const key = await mbx.createSessionKey(this.relayId(), true);
-    const clientTempPk = Utils.fromBase64(key.publicKey);
-
-    await mbx.keyRing.addTempGuest(this.relayId(), this.relayPublicKey);
-    // Now it belongs to the mailbox
-    delete this.relayPublicKey;
-
-    //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
-    const signature = new Uint8Array([...clientTempPk, ...this.relayToken, ...this.clientToken]);
-    const h2Signature = await this.nacl.h2(signature);
-    const encryptedSignature = await mbx.encodeMessage(this.relayId(), h2Signature);
-
-    const payload = {
-      pub_key: mbx.keyRing.getPubCommKey(),
-      nonce: encryptedSignature.nonce,
-      ctext: encryptedSignature.ctext
-    };
-    const outer = await mbx.encodeMessage(this.relayId(), payload, true);
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
-    const messagesNumber = await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
-      outer.nonce, outer.ctext);
-    return parseInt(messagesNumber, 10);
+    return await this.httpCall('prove', h2ClientToken, publicKey, payload.nonce, payload.ctext);
   }
 
   /**
