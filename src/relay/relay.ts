@@ -57,7 +57,7 @@ export class Relay {
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
 
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
-    const [token, diff] = this.splitResponse(data, 2, 'start_session');
+    const [token, diff] = this.parseResponse('start_session', data);
     this.relayToken = Utils.fromBase64(token);
     this.diff = parseInt(diff, 10);
 
@@ -67,7 +67,7 @@ export class Relay {
   }
 
   /**
-   * Complete the handshake
+   * Completes the handshake and saves a relay pubic key
    */
   async getRelayKey(): Promise<void> {
     if (!this.clientToken || !this.relayToken) {
@@ -99,35 +99,36 @@ export class Relay {
     return `relay_#${this.url}`;
   }
 
-  async connectMailbox(mbx: Mailbox): Promise<string> {
-    const key = await mbx.createSessionKey(this.relayId(), true);
-    if (!this.relayPublicKey) {
-      throw new Error('No relay public key');
+  /**
+   * Adds a relay to mailbox keyring and fetches number of messages
+   */
+  async connectMailbox(mbx: Mailbox): Promise<number> {
+    if (!this.relayPublicKey || !this.clientToken || !this.relayToken) {
+      throw new Error('[Relay] No tokens found, run openConnection() first');
     }
+
+    const key = await mbx.createSessionKey(this.relayId(), true);
     const clientTempPk = Utils.fromBase64(key.publicKey);
 
     await mbx.keyRing.addTempGuest(this.relayId(), this.relayPublicKey);
+    // Now it belongs to the mailbox
     delete this.relayPublicKey;
-    if (!this.clientToken || !this.relayToken) {
-      throw new Error('No token');
-    }
 
     //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
     const signature = new Uint8Array([...clientTempPk, ...this.relayToken, ...this.clientToken]);
-
     const h2Signature = await this.nacl.h2(signature);
-    const inner = await mbx.encodeMessage(this.relayId(), h2Signature);
+    const encryptedSignature = await mbx.encodeMessage(this.relayId(), h2Signature);
+
     const payload = {
       pub_key: mbx.keyRing.getPubCommKey(),
-      nonce: inner.nonce,
-      ctext: inner.ctext
+      nonce: encryptedSignature.nonce,
+      ctext: encryptedSignature.ctext
     };
-
     const outer = await mbx.encodeMessage(this.relayId(), payload, true);
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
-    await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
+    const messagesNumber = await this.httpCall('prove', h2ClientToken, Utils.toBase64(clientTempPk),
       outer.nonce, outer.ctext);
-    return this.relayId();
+    return parseInt(messagesNumber, 10);
   }
 
   /**
@@ -145,7 +146,7 @@ export class Relay {
     }
 
     const response = await this.httpCall('command', ...payload);
-    return await this.validateResponse(command, response);
+    return this.parseResponse(command, response);
   }
 
   // ------------------------------ Low-level server request handling ------------------------------
@@ -175,31 +176,32 @@ export class Relay {
   /**
    * Parses relay response and throws an error if its format is unexpected
    */
-  private splitResponse(rawResponse: string, expectedLines: number, command: string): string[] {
+  private parseResponse(command: string, rawResponse: string): string[] {
     let response = rawResponse.split('\r\n');
     if (response.length < 2) {
       response = rawResponse.split('\n');
     }
 
-    if (!rawResponse || (expectedLines && expectedLines !== response.length)) {
+    if (!rawResponse || !this.validateResponse(command, response.length)) {
       throw new Error(`[Relay] ${this.url} - ${command}: Bad response`);
     }
+
     return response;
   }
 
   /**
-   * Compares the expected command response with what was actually received from a relay
+   * Compares the expected number of lines in response with what was actually received from a relay
    */
-  private async validateResponse(command: string, rawResponse: string): Promise<string[]> {
+  private validateResponse(command: string, lines: number): boolean {
     switch (command) {
       case 'upload':
       case 'messageStatus':
       case 'delete':
-        return this.splitResponse(rawResponse, 1, command);
+        return lines === 1;
       case 'downloadFileChunk':
-        return this.splitResponse(rawResponse, 3, command);
+        return lines === 3;
       default:
-        return this.splitResponse(rawResponse, 2, command);
+        return lines === 2;
     }
   }
 
