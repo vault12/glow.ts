@@ -8,6 +8,7 @@ export interface NaClDriver {
   crypto_secretbox_open(box: Uint8Array, nonce: Uint8Array, key: Uint8Array): Promise<Uint8Array | null>;
 
   // Public-key authenticated encryption (box)
+  crypto_box_NONCEBYTES: number;
   crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array>;
   crypto_box_open(cipher: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array | null>;
   crypto_box_random_nonce(): Promise<Uint8Array>;

@@ -73,7 +73,7 @@ export class KeyRing {
     return this.commKey.publicKey;
   }
 
-  async getHpk(): Promise<string> {
+  async getHpk(): Promise<Base64> {
     const hpk = await this.nacl.h2(Utils.fromBase64(this.commKey.publicKey));
     return Utils.toBase64(hpk);
   }

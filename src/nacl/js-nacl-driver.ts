@@ -28,6 +28,8 @@ export class JsNaClDriver implements NaClDriver {
     return secretbox.open(box, nonce, key);
   }
 
+  crypto_box_NONCEBYTES = box.nonceLength;
+
   async crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array> {
     return box(message, nonce, pk, sk);
   }

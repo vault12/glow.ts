@@ -3,8 +3,13 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
-import { Utils } from '../utils/utils';
+import { Base64, Utils } from '../utils/utils';
 import { Mailbox } from '../mailbox/mailbox';
+
+export interface EncryptedMessage {
+  nonce: Base64;
+  ctext: Base64;
+}
 
 /**
  * Low-level operations with Zax relay.
@@ -124,16 +129,12 @@ export class Relay {
     return this.relayId();
   }
 
-  async runCmd(command: string, mailbox: Mailbox, params?: any, ctext?: string): Promise<string[]> {
+  async runCmd(command: string, hpk: Base64, message: EncryptedMessage, ctext?: string): Promise<string[]> {
     if (!Relay.relayCommands.includes(command)) {
-      throw new Error(`Relay ${this.url} doesn't support command ${command}`);
+      throw new Error(`[Relay] ${this.url} doesn't support command ${command}`);
     }
 
-    params = { cmd: command, ...params };
-    const mbxHpk = await mailbox.getHpk();
-    const message = await mailbox.encodeMessage(this.relayId(), params, true);
-
-    const payload = [mbxHpk, message.nonce, message.ctext];
+    const payload = [hpk, message.nonce, message.ctext];
     if (ctext) {
       payload.push(ctext);
     }

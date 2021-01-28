@@ -2,7 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
-import { Relay } from '../relay/relay';
+import { EncryptedMessage, Relay } from '../relay/relay';
 import { Keys } from '../keys/keys';
 
 interface ZaxMessage {
@@ -14,11 +14,6 @@ interface ZaxMessage {
   ctext?: Base64;
   kind: 'message' | 'file';
   msg?: any;
-}
-
-interface EncryptedMessage {
-  nonce: Base64;
-  ctext: Base64;
 }
 
 interface UploadedMessageData {
@@ -87,7 +82,7 @@ export class Mailbox {
 
   // This is the HPK (hash of the public key) of your mailbox. This is what Zax relays
   // use as the universal address of your mailbox.
-  async getHpk(): Promise<string> {
+  async getHpk(): Promise<Base64> {
     return await this.keyRing.getHpk();
   }
 
@@ -109,6 +104,162 @@ export class Mailbox {
     this.sessionKeys.set(session_id, keys);
     return keys;
   }
+
+  async connectToRelay(relay: Relay) {
+    await relay.openConnection();
+    await relay.connectMailbox(this);
+  }
+
+  // ------------------------------ Relay message commands (public API) ------------------------------
+
+  async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
+    const guestPk = this.keyRing.getGuestKey(guestKey);
+    if (!guestPk) {
+      throw new Error(`upload: don't know guest ${guestKey}`);
+    }
+
+    const payload = await this.encodeMessage(guestKey, message);
+    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
+
+    const response = await this.runRelayCommand(relay, 'upload', { to: Utils.toBase64(toHpk), payload });
+    const token = response[0];
+    return { token, nonce: payload.nonce };
+  }
+
+  /**
+   * Downloads messages from a relay and decrypts the contents.
+   */
+  async download(relay: Relay): Promise<ZaxMessage[]> {
+    const response = await this.runRelayCommand(relay, 'download');
+    const messages: ZaxMessage[] = await this.decryptResponse(relay, response);
+
+    for (const msg of messages) {
+      const tag = this.keyRing.getTagByHpk(msg.from);
+      if (!tag) {
+        continue;
+      }
+
+      msg.fromTag = tag;
+
+      if (msg.kind === 'message' && msg.data) {
+        const originalMsg = await this.decodeMessage(tag, msg.nonce, msg.data);
+        if (originalMsg) {
+          msg.msg = originalMsg;
+          delete msg.data;
+        }
+      } else if (msg.kind === 'file' && msg.data) {
+        const data = JSON.parse(msg.data);
+        const originalMsg = await this.decodeMessage(tag, msg.nonce, data.ctext);
+        originalMsg.uploadID = data.uploadID;
+        msg.msg = originalMsg;
+        delete msg.data;
+      } else {
+        throw new Error('download - unknown message type');
+      }
+    }
+
+    return messages;
+  }
+
+  /**
+   * Returns the number of messages in the mailbox on a given relay.
+   */
+  async count(relay: Relay): Promise<number> {
+    const response = await this.runRelayCommand(relay, 'count');
+    return await this.decryptResponse(relay, response);
+  }
+
+  /**
+  * Deletes messages from a relay given a list of base64 message nonces,
+  * and returns the number of remaining messages.
+  */
+  async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
+    const response = await this.runRelayCommand(relay, 'delete', { payload: nonceList });
+    return parseInt(response[0], 10);
+  }
+
+  async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
+    const response = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
+    return parseInt(response[0], 10);
+  }
+
+  // ------------------------------ Relay file commands (public API) ------------------------------
+
+  async startFileUpload(guest: string, relay: Relay, rawMetadata: any) {
+    const guestPk = this.keyRing.getGuestKey(guest);
+    if (!guestPk) {
+      throw new Error(`relaySend: don't know guest ${guest}`);
+    }
+    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
+
+    const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
+    rawMetadata.skey = Utils.toBase64(secretKey);
+
+    const metadata = await this.encodeMessage(guest, rawMetadata);
+
+    const response = await this.runRelayCommand(relay, 'startFileUpload', {
+      to: Utils.toBase64(toHpk),
+      file_size: rawMetadata.orig_size,
+      metadata
+    });
+
+    const decrypted = await this.decryptResponse(relay, response);
+    decrypted.skey = secretKey;
+    return decrypted;
+  }
+
+  async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
+    part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
+    const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
+    const response = await this.runRelayCommand(relay, 'uploadFileChunk', {
+      uploadID,
+      part,
+      last_chunk: (totalParts - 1 === part),
+      nonce: encodedChunk.nonce
+    }, encodedChunk.ctext);
+    return await this.decryptResponse(relay, response);
+  }
+
+  async getFileStatus(relay: Relay, uploadID: string): Promise<FileStatusResponse> {
+    const response = await this.runRelayCommand(relay, 'fileStatus', { uploadID });
+    return await this.decryptResponse(relay, response);
+  }
+
+  async getFileMetadata(relay: Relay, uploadID: string) {
+    const messages = await this.download(relay);
+    const fileMessage = messages
+      .find(encryptedMessage => encryptedMessage.msg.uploadID === uploadID);
+    return fileMessage?.msg;
+  }
+
+  async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
+    const response = await this.runRelayCommand(relay, 'downloadFileChunk', { uploadID, part });
+    const [nonce, ctext, fileCtext] = response;
+    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
+    return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
+  }
+
+  async deleteFile(relay: Relay, uploadID: string): Promise<DeleteFileResponse> {
+    const response = await this.runRelayCommand(relay, 'deleteFile', { uploadID });
+    return await this.decryptResponse(relay, response);
+  }
+
+  // ------------------------------ Dealing with Relay ------------------------------
+
+  private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
+    params = { cmd: command, ...params };
+    const hpk = await this.getHpk();
+    const message = await this.encodeMessage(relay.relayId(), params, true);
+    return await relay.runCmd(command, hpk, message, ctext);
+  }
+
+  private async decryptResponse(relay: Relay, response: string[]) {
+    const [nonce, ctext] = response;
+    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
+    return decoded;
+  }
+
+  // ------------------------------ Message encoding / decoding ------------------------------
 
   // Encodes a free-form object `message` to the guest key of a guest already
   // added to our keyring. If the session flag is set, we will look for keys in
@@ -186,161 +337,18 @@ export class Mailbox {
     return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
 
-  async connectToRelay(relay: Relay) {
-    await relay.openConnection();
-    await relay.connectMailbox(this);
-  }
-
-  // ------------------------------ Relay message commands (public API) ------------------------------
-
-  async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
-    const guestPk = this.keyRing.getGuestKey(guestKey);
-    if (!guestPk) {
-      throw new Error(`upload: don't know guest ${guestKey}`);
-    }
-
-    const payload = await this.encodeMessage(guestKey, message);
-    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
-
-    const response = await relay.runCmd('upload', this, { to: Utils.toBase64(toHpk), payload });
-    const token = response[0];
-    return { token, nonce: payload.nonce };
-  }
-
-  /**
-   * Downloads messages from a relay and decrypts the contents.
-   */
-  async download(relay: Relay): Promise<ZaxMessage[]> {
-    const response = await relay.runCmd('download', this);
-    const messages: ZaxMessage[] = await this.decryptResponse(relay, response);
-
-    for (const msg of messages) {
-      const tag = this.keyRing.getTagByHpk(msg.from);
-      if (!tag) {
-        continue;
-      }
-
-      msg.fromTag = tag;
-
-      if (msg.kind === 'message' && msg.data) {
-        const originalMsg = await this.decodeMessage(tag, msg.nonce, msg.data);
-        if (originalMsg) {
-          msg.msg = originalMsg;
-          delete msg.data;
-        }
-      } else if (msg.kind === 'file' && msg.data) {
-        const data = JSON.parse(msg.data);
-        const originalMsg = await this.decodeMessage(tag, msg.nonce, data.ctext);
-        originalMsg.uploadID = data.uploadID;
-        msg.msg = originalMsg;
-        delete msg.data;
-      } else {
-        throw new Error('download - unknown message type');
-      }
-    }
-
-    return messages;
-  }
-
-  /**
-   * Returns the number of messages in the mailbox on a given relay.
-   */
-  async count(relay: Relay): Promise<number> {
-    const response = await relay.runCmd('count', this);
-    return await this.decryptResponse(relay, response);
-  }
-
-  /**
-  * Deletes messages from a relay given a list of base64 message nonces,
-  * and returns the number of remaining messages.
-  */
-  async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
-    const response = await relay.runCmd('delete', this, { payload: nonceList });
-    return parseInt(response[0], 10);
-  }
-
-  async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
-    const response = await relay.runCmd('messageStatus', this, { token: storageToken });
-    return parseInt(response[0], 10);
-  }
-
-  // ------------------------------ Relay file commands (public API) ------------------------------
-
-  async startFileUpload(guest: string, relay: Relay, rawMetadata: any) {
-    const guestPk = this.keyRing.getGuestKey(guest);
-    if (!guestPk) {
-      throw new Error(`relaySend: don't know guest ${guest}`);
-    }
-    const toHpk = await this.nacl.h2(Utils.fromBase64(guestPk));
-
-    const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
-    rawMetadata.skey = Utils.toBase64(secretKey);
-
-    const metadata = await this.encodeMessage(guest, rawMetadata);
-
-    const response = await relay.runCmd('startFileUpload', this, {
-      to: Utils.toBase64(toHpk),
-      file_size: rawMetadata.orig_size,
-      metadata
-    });
-
-    const decrypted = await this.decryptResponse(relay, response);
-    decrypted.skey = secretKey;
-    return decrypted;
-  }
-
-  async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
-    part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
-    const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
-    const response = await relay.runCmd('uploadFileChunk', this, {
-      uploadID,
-      part,
-      last_chunk: (totalParts - 1 === part),
-      nonce: encodedChunk.nonce
-    }, encodedChunk.ctext);
-    return await this.decryptResponse(relay, response);
-  }
-
-  async getFileStatus(relay: Relay, uploadID: string): Promise<FileStatusResponse> {
-    const response = await relay.runCmd('fileStatus', this, { uploadID });
-    return await this.decryptResponse(relay, response);
-  }
-
-  async getFileMetadata(relay: Relay, uploadID: string) {
-    const messages = await this.download(relay);
-    const fileMessage = messages
-      .find(encryptedMessage => encryptedMessage.msg.uploadID === uploadID);
-    return fileMessage?.msg;
-  }
-
-  async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
-    const response = await relay.runCmd('downloadFileChunk', this, { uploadID, part });
-    const [nonce, ctext, fileCtext] = response;
-    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
-    return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
-  }
-
-  async deleteFile(relay: Relay, uploadID: string): Promise<DeleteFileResponse> {
-    const response = await relay.runCmd('deleteFile', this, { uploadID });
-    return await this.decryptResponse(relay, response);
-  }
-
-  private async decryptResponse(relay: Relay, response: string[]) {
-    const [nonce, ctext] = response;
-    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
-    return decoded;
-  }
-
   // ------------------------------ Nonce helpers ------------------------------
 
-  // Makes a timestamp nonce that a relay expects for any crypto operations.
-  // timestamp is the first 8 bytes, the rest is random, unless custom 'data'
-  // is specified. 'data' will be packed as next 4 bytes after timestamp
-  private async makeNonce(data?: number) {
+  /**
+   * Makes a timestamp nonce that a relay expects for any crypto operations.
+   * Timestamp is the first 8 bytes, the rest is random, unless custom `data`
+   * is specified. `data` will be packed as next 4 bytes after timestamp.
+   */
+  private async makeNonce(data?: number): Promise<Uint8Array> {
     const nonce = await this.nacl.crypto_box_random_nonce();
     let headerLen;
-    if (nonce.length !== 24) {
-      throw new Error('RNG failed, try again?');
+    if (nonce.length !== this.nacl.crypto_box_NONCEBYTES) {
+      throw new Error('[Mailbox] Wrong crypto_box nonce length');
     }
     // split timestamp integer as an array of bytes
     headerLen = 8; // max timestamp size
@@ -362,7 +370,9 @@ export class Mailbox {
     return nonce;
   }
 
-  // Split an integer into an array of bytes
+  /**
+   * Splits an integer into an array of bytes
+   */
   private itoa(num: number): Uint8Array {
     // calculate length first
     let hex = num.toString(16);
