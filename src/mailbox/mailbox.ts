@@ -16,9 +16,25 @@ interface ZaxMessage {
   msg?: any;
 }
 
+interface FileUploadMetadata {
+  name: string;
+  orig_size: number;
+  md5?: string;
+  created?: number;
+  modified?: number;
+  attrs?: string;
+  skey?: Base64;
+}
 interface UploadedMessageData {
   token: Base64;
   nonce: Base64;
+}
+
+interface StartFileUploadResponse {
+  uploadID: string;
+  max_chunk_size: number;
+  storage_token: string;
+  skey?: Uint8Array;
 }
 
 interface UploadFileChunkResponse {
@@ -104,15 +120,15 @@ export class Mailbox {
   /**
    * Generates and stores a pair of keys required to start a relay session
    */
-  async createSessionKey(session_id: string, forceNew: boolean): Promise<Keys> {
-    const existingKey = this.sessionKeys.get(session_id);
+  async createSessionKey(sessionId: string, forceNew: boolean): Promise<Keys> {
+    const existingKey = this.sessionKeys.get(sessionId);
     if (!forceNew && existingKey) {
       return Promise.resolve(existingKey);
     }
 
     const keypair = await this.nacl.crypto_box_keypair();
     const keys = new Keys(keypair);
-    this.sessionKeys.set(session_id, keys);
+    this.sessionKeys.set(sessionId, keys);
     return keys;
   }
 
@@ -155,14 +171,13 @@ export class Mailbox {
   async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
-      throw new Error(`upload: don't know guest ${guestKey}`);
+      throw new Error(`[Mailbox] upload: Don't know guest ${guestKey}`);
     }
 
     const payload = await this.encodeMessage(guestKey, message);
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
-    const response = await this.runRelayCommand(relay, 'upload', { to: toHpk, payload });
-    const token = response[0];
+    const [token] = await this.runRelayCommand(relay, 'upload', { to: toHpk, payload });
     return { token, nonce: payload.nonce };
   }
 
@@ -194,7 +209,7 @@ export class Mailbox {
         msg.msg = originalMsg;
         delete msg.data;
       } else {
-        throw new Error('download - unknown message type');
+        throw new Error('[Mailbox] download - Unknown message type');
       }
     }
 
@@ -225,10 +240,15 @@ export class Mailbox {
 
   // ---------- Relay file commands (public API) ----------
 
-  async startFileUpload(guest: string, relay: Relay, rawMetadata: any) {
+  /**
+   * Asks Zax to start a new upload session, and returns a unique file identifier
+   * required to upload file chunks.
+   */
+  async startFileUpload(guest: string, relay: Relay,
+    rawMetadata: FileUploadMetadata): Promise<StartFileUploadResponse> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`relaySend: don't know guest ${guest}`);
+      throw new Error(`[Mailbox] startFileUpload: Don't know guest ${guest}`);
     }
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
@@ -243,11 +263,14 @@ export class Mailbox {
       metadata
     });
 
-    const decrypted = await this.decryptResponse(relay, response);
+    const decrypted: StartFileUploadResponse = await this.decryptResponse(relay, response);
     decrypted.skey = secretKey;
     return decrypted;
   }
 
+  /**
+   * Encrypts the file chunk symmetrically and transfers it to a relay
+   */
   async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
     const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
@@ -260,6 +283,11 @@ export class Mailbox {
     return await this.decryptResponse(relay, response);
   }
 
+  /**
+   * Returns the status of a file upload by its relay-specific uploadID. Uploader can call it
+   * to verify the correct transfer, and downloader can check if the file exists and retrieve
+   * the number of chunks
+   */
   async getFileStatus(relay: Relay, uploadID: string): Promise<FileStatusResponse> {
     const response = await this.runRelayCommand(relay, 'fileStatus', { uploadID });
     return await this.decryptResponse(relay, response);
@@ -267,11 +295,14 @@ export class Mailbox {
 
   async getFileMetadata(relay: Relay, uploadID: string) {
     const messages = await this.download(relay);
-    const fileMessage = messages
-      .find(encryptedMessage => encryptedMessage.msg.uploadID === uploadID);
+    const fileMessage = messages.find(message => message.msg.uploadID === uploadID);
     return fileMessage?.msg;
   }
 
+  /**
+   * Downloads a binary chunk of a file from a relay by a given uploadID.  The total number of chunks
+   * can be retrieved via a `getFileStatus` request
+   */
   async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
     const response = await this.runRelayCommand(relay, 'downloadFileChunk', { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
@@ -279,6 +310,10 @@ export class Mailbox {
     return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
+  /**
+   * Deletes a file from the relay (or all chunks uploaded so far, if the upload was not completed).
+   * Can be called by either the sender or recipient
+   */
   async deleteFile(relay: Relay, uploadID: string): Promise<DeleteFileResponse> {
     const response = await this.runRelayCommand(relay, 'deleteFile', { uploadID });
     return await this.decryptResponse(relay, response);
@@ -308,7 +343,7 @@ export class Mailbox {
   async encodeMessage(guest: string, message: any, session = false, skTag = null): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`encodeMessage: don't know guest ${guest}`);
+      throw new Error(`[Mailbox] encodeMessage: Don't know guest ${guest}`);
     }
 
     let privateKey = this.keyRing.commKey.privateKey;
@@ -340,7 +375,7 @@ export class Mailbox {
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64, session = false, skTag = null) {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`decodeMessage: don't know guest ${guest}`);
+      throw new Error(`[Mailbox] decodeMessage: Don't know guest ${guest}`);
     }
 
     let privateKey = this.keyRing.commKey.privateKey;
