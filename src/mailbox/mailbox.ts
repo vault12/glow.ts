@@ -100,6 +100,8 @@ export class Mailbox {
     return await this.new(id, backup);
   }
 
+  // ---------- Mailbox keys ----------
+
   /**
    * Returns HPK (hash of the public key) of the mailbox. This is what Zax relays
    * uses as the universal address of the mailbox
@@ -118,12 +120,13 @@ export class Mailbox {
   }
 
   /**
-   * Generates and stores a pair of keys required to start a relay session
+   * Generates and stores a pair of keys required to start a relay session.
+   * Each session with each Zax relay creates its own temporary session keys
    */
   async createSessionKey(sessionId: string, forceNew: boolean): Promise<Keys> {
     const existingKey = this.sessionKeys.get(sessionId);
     if (!forceNew && existingKey) {
-      return Promise.resolve(existingKey);
+      return existingKey;
     }
 
     const keypair = await this.nacl.crypto_box_keypair();
@@ -263,7 +266,7 @@ export class Mailbox {
       metadata
     });
 
-    const decrypted: StartFileUploadResponse = await this.decryptResponse(relay, response);
+    const decrypted = await this.decryptResponse(relay, response);
     decrypted.skey = secretKey;
     return decrypted;
   }
@@ -336,11 +339,12 @@ export class Mailbox {
 
   // ---------- Message encoding / decoding ----------
 
-  // Encodes a free-form object `message` to the guest key of a guest already
-  // added to our keyring. If the session flag is set, we will look for keys in
-  // temporary, not the persistent collection of session keys. skTag lets you
-  // specifiy the secret key in a key ring
-  async encodeMessage(guest: string, message: any, session = false, skTag = null): Promise<EncryptedMessage> {
+  /**
+   * Encodes a free-form object `message` to the guest key of a guest already
+   * added to the keyring. If the session flag is set, we will look for keys in
+   * temporary, not the persistent collection of session keys
+   */
+  async encodeMessage(guest: string, message: any, session = false): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`[Mailbox] encodeMessage: Don't know guest ${guest}`);
@@ -357,8 +361,6 @@ export class Mailbox {
       message = await this.nacl.encode_utf8(JSON.stringify(message));
     }
 
-    // TODO: add whatever neccesary int32 id/counter logic and provide nonceData as last param
-    // That int32 (on receive/decode) can be restored via _nonceData()
     return await this.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
@@ -372,7 +374,12 @@ export class Mailbox {
     };
   }
 
-  async decodeMessage(guest: string, nonce: Base64, ctext: Base64, session = false, skTag = null) {
+  /**
+   * Decodes a ciphertext from a guest key already in our keyring with this
+   * nonce. If session flag is set, looks for keys in temporary, not the
+   * persistent collection of session keys
+   */
+  async decodeMessage(guest: string, nonce: Base64, ctext: Base64, session = false): Promise<any> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`[Mailbox] decodeMessage: Don't know guest ${guest}`);
