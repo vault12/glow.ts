@@ -36,63 +36,74 @@ interface DeleteFileResponse {
   status: 'OK' | 'NOT_FOUND';
 }
 
-/**
- * Low-level operations with Zax relay.
- */
 export class Mailbox {
   public keyRing: KeyRing;
+  public identity: string;
 
   private nacl: NaClDriver;
-  private identity?: string;
   private sessionKeys: Map<string, Keys> = new Map();
 
-  private constructor(naclDriver: NaClDriver, keyRing: KeyRing) {
+  private constructor(naclDriver: NaClDriver, keyRing: KeyRing, identity: string) {
     this.nacl = naclDriver;
     this.keyRing = keyRing;
+    this.identity = identity;
   }
 
   static async new(id: string, backup?: string): Promise<Mailbox> {
     const nacl = NaCl.getInstance();
     const keyRing = backup ? await KeyRing.fromBackup(id, backup) : await KeyRing.new(id);
-    const mbx = new Mailbox(nacl, keyRing);
+    const mbx = new Mailbox(nacl, keyRing, id);
     mbx.identity = id;
     return mbx;
   }
 
-  // -------------------------------- Alternative initializers --------------------------------
+  // ---------- Alternative initializers ----------
 
-  // You can create a Mailbox where the secret identity key is derived from a well-known seed
+  /**
+   * Create a Mailbox where the secret identity key is derived from a well-known seed
+   */
   static async fromSeed(id: string, seed: Uint8Array): Promise<Mailbox> {
     const mbx = await this.new(id);
     await mbx.keyRing.setCommFromSeed(seed);
     return mbx;
   }
 
-  // You can also create a Mailbox if you already know the secret identity key
+  /**
+   * Create a Mailbox from the known secret identity key
+   */
   static async fromSecKey(id: string, rawSecretKey: Uint8Array): Promise<Mailbox> {
     const mbx = await this.new(id);
     await mbx.keyRing.setCommFromSecKey(rawSecretKey);
     return mbx;
   }
 
-  // You can also create a Mailbox from backup string
+  /**
+   * Create a Mailbox from the backup string
+   */
   static async fromBackup(id: string, backup: string): Promise<Mailbox> {
     return await this.new(id, backup);
   }
 
-  // This is the HPK (hash of the public key) of your mailbox. This is what Zax relays
-  // use as the universal address of your mailbox.
+  /**
+   * Returns HPK (hash of the public key) of the mailbox. This is what Zax relays
+   * uses as the universal address of the mailbox
+   */
   async getHpk(): Promise<Base64> {
     return await this.keyRing.getHpk();
   }
 
-  // This is your public identity and default communication key. Your
-  // correspondents can know it, whereas Relays do not need it (other than
-  // temporarily for internal use during the ownership proof)
+  /**
+   * Returns public identity, which is the default communication key.
+   * Correspondents can know it, whereas Relays do not need it (other than
+   * temporarily for internal use during the ownership proof)
+   */
   getPubCommKey(): string {
     return this.keyRing.getPubCommKey();
   }
 
+  /**
+   * Generates and stores a pair of keys required to start a relay session
+   */
   async createSessionKey(session_id: string, forceNew: boolean): Promise<Keys> {
     const existingKey = this.sessionKeys.get(session_id);
     if (!forceNew && existingKey) {
@@ -136,8 +147,11 @@ export class Mailbox {
     return parseInt(messagesNumber, 10);
   }
 
-  // ------------------------------ Relay message commands (public API) ------------------------------
+  // ---------- Relay message commands (public API) ----------
 
+  /**
+   * Sends a message to the guest through a relay
+   */
   async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
@@ -153,7 +167,7 @@ export class Mailbox {
   }
 
   /**
-   * Downloads messages from a relay and decrypts the contents.
+   * Downloads messages from a relay and decrypts the contents
    */
   async download(relay: Relay): Promise<ZaxMessage[]> {
     const response = await this.runRelayCommand(relay, 'download');
@@ -209,7 +223,7 @@ export class Mailbox {
     return parseInt(response[0], 10);
   }
 
-  // ------------------------------ Relay file commands (public API) ------------------------------
+  // ---------- Relay file commands (public API) ----------
 
   async startFileUpload(guest: string, relay: Relay, rawMetadata: any) {
     const guestPk = this.keyRing.getGuestKey(guest);
@@ -270,7 +284,7 @@ export class Mailbox {
     return await this.decryptResponse(relay, response);
   }
 
-  // ------------------------------ Dealing with Relay ------------------------------
+  // ---------- Dealing with Relay ----------
 
   private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
@@ -285,7 +299,7 @@ export class Mailbox {
     return decoded;
   }
 
-  // ------------------------------ Message encoding / decoding ------------------------------
+  // ---------- Message encoding / decoding ----------
 
   // Encodes a free-form object `message` to the guest key of a guest already
   // added to our keyring. If the session flag is set, we will look for keys in
@@ -363,7 +377,7 @@ export class Mailbox {
     return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
 
-  // ------------------------------ Nonce helpers ------------------------------
+  // ---------- Nonce helpers ----------
 
   /**
    * Makes a timestamp nonce that a relay expects for any crypto operations.

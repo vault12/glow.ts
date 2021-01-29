@@ -35,7 +35,7 @@ export class Relay {
     this.diff = 0;
   }
 
-  // ------------------------------ Connection initialization ------------------------------
+  // ---------- Connection initialization ----------
 
   /**
    * Exchanges tokens with a relay and gets a temp session key for this relay
@@ -110,6 +110,8 @@ export class Relay {
     return await this.httpCall('prove', h2ClientToken, publicKey, payload.nonce, payload.ctext);
   }
 
+  // ---------- Low-level server request handling ----------
+
   /**
    * Executes a message/file command on a relay, parses and validates the response
    */
@@ -127,8 +129,6 @@ export class Relay {
     const response = await this.httpCall('command', ...payload);
     return this.parseResponse(command, response);
   }
-
-  // ------------------------------ Low-level server request handling ------------------------------
 
   /**
    * Executes a call to a relay and return raw string response
@@ -184,7 +184,7 @@ export class Relay {
     }
   }
 
-  // -------------------------------- Difficulty adjustment --------------------------------
+  // ---------- Difficulty adjustment ----------
 
   /**
    * Continuously calculates the nonce until one requested by a relay is found
