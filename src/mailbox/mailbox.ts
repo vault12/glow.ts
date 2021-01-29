@@ -34,7 +34,7 @@ interface StartFileUploadResponse {
   uploadID: string;
   max_chunk_size: number;
   storage_token: string;
-  skey?: Uint8Array;
+  skey: Uint8Array;
 }
 
 interface UploadFileChunkResponse {
@@ -220,7 +220,7 @@ export class Mailbox {
   }
 
   /**
-   * Returns the number of messages in the mailbox on a given relay.
+   * Returns the number of messages in the mailbox on a given relay
    */
   async count(relay: Relay): Promise<number> {
     const response = await this.runRelayCommand(relay, 'count');
@@ -229,13 +229,19 @@ export class Mailbox {
 
   /**
   * Deletes messages from a relay given a list of base64 message nonces,
-  * and returns the number of remaining messages.
+  * and returns the number of remaining messages
   */
   async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
     const response = await this.runRelayCommand(relay, 'delete', { payload: nonceList });
     return parseInt(response[0], 10);
   }
 
+  /**
+  * Gets the status of a previously sent message as redis TTL
+  * -2 : missing key
+  * -1 : key never expires
+  * 0+ : key time to live in seconds
+  */
   async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
     const response = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
     return parseInt(response[0], 10);
@@ -267,6 +273,7 @@ export class Mailbox {
     });
 
     const decrypted = await this.decryptResponse(relay, response);
+    // append symmetric secret key (unique for this upload session) to the server response
     decrypted.skey = secretKey;
     return decrypted;
   }
@@ -296,10 +303,13 @@ export class Mailbox {
     return await this.decryptResponse(relay, response);
   }
 
-  async getFileMetadata(relay: Relay, uploadID: string) {
+  /**
+   * Fetches the file metadata by uploadID, which was declared by the uploader
+   */
+  async getFileMetadata(relay: Relay, uploadID: string): Promise<FileUploadMetadata> {
     const messages = await this.download(relay);
     const fileMessage = messages.find(message => message.msg.uploadID === uploadID);
-    return fileMessage?.msg;
+    return fileMessage?.msg as FileUploadMetadata;
   }
 
   /**
@@ -324,6 +334,9 @@ export class Mailbox {
 
   // ---------- Dealing with Relay ----------
 
+  /**
+   * Encrypts the payload of the command and sends it to a relay
+   */
   private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.getHpk();
@@ -331,6 +344,10 @@ export class Mailbox {
     return await relay.runCmd(command, hpk, message, ctext);
   }
 
+  /**
+   * Parses relay's response to a command, for those commands that expect an encrypted message in return.
+   * Two lines of POST response will be nonce and ctext
+   */
   private async decryptResponse(relay: Relay, response: string[]) {
     const [nonce, ctext] = response;
     const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
@@ -364,6 +381,9 @@ export class Mailbox {
     return await this.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
+  /**
+   * Encodes a binary message with `cryptobox`
+   */
   async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
     skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
     const nonce = await this.makeNonce(nonceData);
@@ -396,6 +416,9 @@ export class Mailbox {
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
+  /**
+   * Decodes a binary message with `cryptobox_open`
+   */
   async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
     const data = await this.nacl.crypto_box_open(ctext, nonce, pkFrom, skTo);
     if (data) {
@@ -406,6 +429,9 @@ export class Mailbox {
     return data;
   }
 
+  /**
+   * Encodes a binary message with `secretbox` (used for file chunk encryption)
+   */
   async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array): Promise<EncryptedMessage> {
     const nonce = await this.makeNonce();
     const ctext = await this.nacl.crypto_secretbox(message, nonce, secretKey);
@@ -415,6 +441,9 @@ export class Mailbox {
     };
   }
 
+  /**
+   * Decodes a binary message with `secretbox_open` (used for file chunk decryption)
+   */
   async decodeMessageSymmetric(nonce: Base64, ctext: Base64, secretKey: Uint8Array): Promise<Uint8Array | null> {
     return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
