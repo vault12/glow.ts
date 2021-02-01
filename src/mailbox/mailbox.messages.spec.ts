@@ -58,6 +58,6 @@ describe('Relay', () => {
 
   it('check deleted message status', async () => {
     const ttl = await Alice.messageStatus(testRelay, token);
-    expect(ttl).toBe(-2); // the key is missing on the relay
+    expect(ttl).toBe(0); // the key is missing on the relay
   });
 });

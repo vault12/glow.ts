@@ -3,6 +3,11 @@ import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
 import { EncryptedMessage, Relay } from '../relay/relay';
+import { StartFileUploadResponse,
+         UploadFileChunkResponse,
+         FileStatusResponse,
+         DeleteFileResponse,
+         MessageStatusResponse } from '../zax.interface';
 import { Keys } from '../keys/keys';
 
 interface ZaxMessage {
@@ -30,28 +35,10 @@ interface UploadedMessageData {
   nonce: Base64;
 }
 
-interface StartFileUploadResponse {
-  uploadID: string;
-  max_chunk_size: number;
-  storage_token: string;
-  skey: Uint8Array;
-}
-
-interface UploadFileChunkResponse {
-  status: string;
-}
-
-interface FileStatusResponse {
-  status: 'COMPLETE' | 'UPLOADING' | 'START' | 'NOT_FOUND';
-  total_chunks: number;
-  file_size: number;
-  bytes_stored: number;
-}
-
-interface DeleteFileResponse {
-  status: 'OK' | 'NOT_FOUND';
-}
-
+/**
+ * Mailbox class represents a wrapper around a Keyring that allows to exchange
+ * encrypted messages with other Mailboxes via a relay
+ */
 export class Mailbox {
   public keyRing: KeyRing;
   public identity: string;
@@ -136,7 +123,9 @@ export class Mailbox {
   }
 
   /**
-   * Adds a relay to mailbox keyring and fetches number of messages
+   * Establishes a session, exchanges temp keys and proves our ownership of this
+   * Mailbox to this specific relay. This is the first function to start
+   * communications with any relay. Returns the number of messages in the mailbox
    */
   async connectToRelay(relay: Relay): Promise<number> {
     await relay.openConnection();
@@ -169,7 +158,7 @@ export class Mailbox {
   // ---------- Relay message commands (public API) ----------
 
   /**
-   * Sends a message to the guest through a relay
+   * Sends a free-form object to a guest we already have in our keyring
    */
   async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
     const guestPk = this.keyRing.getGuestKey(guestKey);
@@ -232,19 +221,21 @@ export class Mailbox {
   * and returns the number of remaining messages
   */
   async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
-    const response = await this.runRelayCommand(relay, 'delete', { payload: nonceList });
-    return parseInt(response[0], 10);
+    const [response] = await this.runRelayCommand(relay, 'delete', { payload: nonceList });
+    return parseInt(response, 10);
   }
 
   /**
-  * Gets the status of a previously sent message as redis TTL
-  * -2 : missing key
-  * -1 : key never expires
-  * 0+ : key time to live in seconds
+  * Gets the status of a previously sent Zax message by a storage token.
+  * Returns "time to live" in seconds or 0 if the message is not found
   */
   async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
-    const response = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
-    return parseInt(response[0], 10);
+    const [response] = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
+    const status = parseInt(response, 10);
+    if (status === MessageStatusResponse.MissingKey || status === MessageStatusResponse.NeverExpires) {
+      return 0;
+    }
+    return status;
   }
 
   // ---------- Relay file commands (public API) ----------
