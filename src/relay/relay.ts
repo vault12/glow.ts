@@ -19,12 +19,10 @@ export class Relay {
     // Message commands
     'count', 'upload', 'download', 'messageStatus', 'delete',
     // File commands
-    'startFileUpload', 'uploadFileChunk', 'downloadFileChunk', 'fileStatus', 'deleteFile',
-    // Reserved for future use
-    'getEntropy'];
+    'startFileUpload', 'uploadFileChunk', 'downloadFileChunk', 'fileStatus', 'deleteFile'];
 
   private nacl: NaClDriver;
-  private diff: number;
+  private difficulty: number;
 
   constructor(
     public url: string,
@@ -32,7 +30,7 @@ export class Relay {
     public relayToken?: Uint8Array,
     public relayPublicKey?: Base64) {
     this.nacl = NaCl.getInstance();
-    this.diff = 0;
+    this.difficulty = 0;
   }
 
   // ---------- Connection initialization ----------
@@ -57,12 +55,12 @@ export class Relay {
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
 
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
-    const [token, diff] = this.parseResponse('start_session', data);
+    const [token, difficulty] = this.parseResponse('start_session', data);
     this.relayToken = Utils.fromBase64(token);
-    this.diff = parseInt(diff, 10);
+    this.difficulty = parseInt(difficulty, 10);
 
-    if (this.diff > 10) {
-      console.log(`[Relay] ${this.url} requested difficulty ${this.diff}. Session handshake may take longer.`);
+    if (this.difficulty > 10) {
+      console.log(`[Relay] ${this.url} requested difficulty ${this.difficulty}. Session handshake may take longer.`);
     }
   }
 
@@ -80,10 +78,10 @@ export class Relay {
     let sessionHandshake: Uint8Array;
 
     // Compute session handshake based on difficulty level set by the server
-    if (this.diff === 0) {
+    if (this.difficulty === 0) {
       sessionHandshake = await this.nacl.h2(handshake);
     } else {
-      sessionHandshake = await this.ensureNonceDiff(handshake);
+      sessionHandshake = await this.ensureNonceDifficulty(handshake);
     }
 
     // We confirm handshake by sending back h2(clientToken, relay_token)
@@ -134,8 +132,6 @@ export class Relay {
    * Executes a call to a relay and return raw string response
    */
   private async httpCall(command: string, ...params: string[]): Promise<string> {
-    axios.defaults.adapter = require('axios/lib/adapters/http');
-
     const requestPayload: AxiosRequestConfig = {
       url: `${this.url}/${command}`,
       method: 'post',
@@ -189,13 +185,13 @@ export class Relay {
   /**
    * Continuously calculates the nonce until one requested by a relay is found
    */
-  private async ensureNonceDiff(handshake: Uint8Array) {
+  private async ensureNonceDifficulty(handshake: Uint8Array) {
     let nonce;
     let h2;
     do {
       nonce = await this.nacl.random_bytes(32);
       h2 = await this.nacl.h2(new Uint8Array([...handshake, ...nonce]));
-    } while (!this.arrayZeroBits(h2, this.diff));
+    } while (!this.arrayZeroBits(h2, this.difficulty));
 
     return nonce;
   }
