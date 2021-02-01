@@ -70,9 +70,16 @@ describe('Relay / File transfer', () => {
   it('check file status and retrieve metadata', async () => {
     const statusAlice = await Alice.getFileStatus(testRelay, uploadID);
     expect(statusAlice.status).toBe('COMPLETE');
+    expect(statusAlice.file_size).toBe(765);
+    expect(statusAlice.total_chunks).toBe(numberOfChunks);
+    expect(statusAlice.bytes_stored).toBeGreaterThan(765);
+
     await Bob.connectToRelay(testRelay);
     const statusBob = await Bob.getFileStatus(testRelay, uploadID);
     expect(statusBob.status).toBe('COMPLETE');
+    expect(statusAlice.file_size).toBe(765);
+    expect(statusAlice.total_chunks).toBe(numberOfChunks);
+    expect(statusAlice.bytes_stored).toBeGreaterThan(765);
 
     const metadata = await Bob.getFileMetadata(testRelay, uploadID);
     expect(typeof metadata.skey).toBe('string');
@@ -88,7 +95,7 @@ describe('Relay / File transfer', () => {
     for (let i = 0; i < numberOfChunks; i++) {
       const chunk = await Bob.downloadFileChunk(testRelay, uploadID, i, skey);
       if (!chunk) {
-        throw new Error('error dowloading chunk');
+        throw new Error('Error downloading chunk');
       }
       decodedFile.set(chunk, downloadedBytes);
       downloadedBytes += chunk.length;
