@@ -3,33 +3,21 @@ import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
 import { EncryptedMessage, Relay } from '../relay/relay';
-import { StartFileUploadResponse,
-         UploadFileChunkResponse,
-         FileStatusResponse,
-         DeleteFileResponse,
-         MessageStatusResponse } from '../zax.interface';
+import {
+  StartFileUploadResponse,
+  UploadFileChunkResponse,
+  FileStatusResponse,
+  DeleteFileResponse,
+  MessageStatusResponse,
+  FileUploadMetadata,
+  ZaxRawMessage,
+  ZaxFileMessage,
+  ZaxPlainMessage,
+  ZaxTextMessage,
+  ParsedZaxMessage
+} from '../zax.interface';
 import { Keys } from '../keys/keys';
 
-interface ZaxMessage {
-  data?: Base64;
-  time: number;
-  from: Base64;
-  fromTag?: string;
-  nonce: Base64;
-  ctext?: Base64;
-  kind: 'message' | 'file';
-  msg?: any;
-}
-
-interface FileUploadMetadata {
-  name: string;
-  orig_size: number;
-  md5?: string;
-  created?: number;
-  modified?: number;
-  attrs?: string;
-  skey?: Base64;
-}
 interface UploadedMessageData {
   token: Base64;
   nonce: Base64;
@@ -174,38 +162,54 @@ export class Mailbox {
   }
 
   /**
-   * Downloads messages from a relay and decrypts the contents
+   * Downloads all messages from a relay, decrypts them with a relay key,
+   * and then parses each message to find out if it's a text message, file message,
+   * or if it can't be decrypted because HPK is missing in the keyring.
+   * Returns an array of mixed messages
    */
-  async download(relay: Relay): Promise<ZaxMessage[]> {
+  async download(relay: Relay): Promise<ParsedZaxMessage[]> {
     const response = await this.runRelayCommand(relay, 'download');
-    const messages: ZaxMessage[] = await this.decryptResponse(relay, response);
+    const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
 
-    for (const msg of messages) {
-      const tag = this.keyRing.getTagByHpk(msg.from);
-      if (!tag) {
-        continue;
-      }
-
-      msg.fromTag = tag;
-
-      if (msg.kind === 'message' && msg.data) {
-        const originalMsg = await this.decodeMessage(tag, msg.nonce, msg.data);
-        if (originalMsg) {
-          msg.msg = originalMsg;
-          delete msg.data;
-        }
-      } else if (msg.kind === 'file' && msg.data) {
-        const data = JSON.parse(msg.data);
-        const originalMsg = await this.decodeMessage(tag, msg.nonce, data.ctext);
-        originalMsg.uploadID = data.uploadID;
-        msg.msg = originalMsg;
-        delete msg.data;
+    const parsedMessages: ParsedZaxMessage[] = [];
+    for (const message of messages) {
+      const senderTag = this.keyRing.getTagByHpk(message.from);
+      if (!senderTag) {
+        parsedMessages.push(await this.parsePlainMessage(message));
+      } else if (message.kind === 'message') {
+        parsedMessages.push(await this.parseTextMessage(message, senderTag));
+      } else if (message.kind === 'file') {
+        parsedMessages.push(await this.parseFileMessage(message, senderTag));
       } else {
         throw new Error('[Mailbox] download - Unknown message type');
       }
     }
+    return parsedMessages;
+  }
 
-    return messages;
+  /**
+   * Marks a raw Zax message as one that can't be decrypted,
+   * because sender's HPK is not found in the keyring
+   */
+  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage): Promise<ZaxPlainMessage> {
+    return { data, time, from, nonce, kind: 'plain' };
+  }
+
+  /**
+   * Decrypts a message that represents uploaded file metadata
+   */
+  private async parseFileMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxFileMessage> {
+    const { nonce, ctext, uploadID } = JSON.parse(message.data);
+    const data: FileUploadMetadata = await this.decodeMessage(senderTag, nonce, ctext);
+    return { data, time: message.time, senderTag, uploadID, nonce, kind: 'file' };
+  }
+
+  /**
+   * Decrypts a regular encrypted Zax message
+   */
+  private async parseTextMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxTextMessage> {
+    const data = await this.decodeMessage(senderTag, message.nonce, message.data);
+    return({ data, time: message.time, senderTag, nonce: message.nonce, kind: 'message' });
   }
 
   /**
@@ -299,8 +303,11 @@ export class Mailbox {
    */
   async getFileMetadata(relay: Relay, uploadID: string): Promise<FileUploadMetadata> {
     const messages = await this.download(relay);
-    const fileMessage = messages.find(message => message.msg.uploadID === uploadID);
-    return fileMessage?.msg as FileUploadMetadata;
+
+    const fileMessage = messages
+      .filter(message => message.kind === 'file')
+      .find(message => (message as ZaxFileMessage).uploadID === uploadID);
+    return fileMessage?.data as FileUploadMetadata;
   }
 
   /**

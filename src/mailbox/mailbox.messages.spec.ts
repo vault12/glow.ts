@@ -43,7 +43,7 @@ describe('Relay', () => {
   it('download Bob mailbox', async () => {
     const downloaded = await Bob.download(testRelay);
     const message = downloaded[0];
-    expect(message.msg).toBe('some message');
+    expect(message.data).toBe('some message');
   });
 
   it('delete from Bob mailbox', async () => {
