@@ -1,10 +1,11 @@
 import { Relay } from '../relay/relay';
 import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
-import { randomNumber } from './tests.helper';
+import { randomNumber } from '../tests.helper';
+import { FileUploadMetadata } from '../zax.interface';
 import fs from 'fs';
 
-describe('Relay / File transfer', () => {
+describe('Mailbox / File transfer', () => {
   let testRelay: Relay;
   let Alice: Mailbox;
   let Bob: Mailbox;
@@ -16,6 +17,7 @@ describe('Relay / File transfer', () => {
 
   let uploadID: string;
   let skey: Uint8Array;
+  let metadata: FileUploadMetadata;
 
   beforeAll(async () => {
     NaCl.setInstance();
@@ -42,12 +44,13 @@ describe('Relay / File transfer', () => {
   });
 
   it('start upload', async () => {
-    const response = await Alice.startFileUpload('Bob', testRelay, {
+    metadata = {
       name: randomNumber(1, 100) + '.zip',
       orig_size: 765,
       created: randomNumber(1480000000, 1520000000),
       modified: randomNumber(1480000000, 1520000000)
-    });
+    };
+    const response = await Alice.startFileUpload('Bob', testRelay, metadata);
 
     expect(response).toHaveProperty('uploadID');
     expect(response).toHaveProperty('max_chunk_size');
@@ -81,12 +84,8 @@ describe('Relay / File transfer', () => {
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
     expect(statusAlice.bytes_stored).toBeGreaterThan(765);
 
-    const metadata = await Bob.getFileMetadata(testRelay, uploadID);
-    expect(typeof metadata.skey).toBe('string');
-    expect(metadata.orig_size).toBe(file.length);
-    expect(metadata).toHaveProperty('name');
-    expect(metadata).toHaveProperty('created');
-    expect(metadata).toHaveProperty('modified');
+    const fetchedMetadata = await Bob.getFileMetadata(testRelay, uploadID);
+    expect(fetchedMetadata).toEqual(metadata);
   });
 
   it('download chunks', async () => {

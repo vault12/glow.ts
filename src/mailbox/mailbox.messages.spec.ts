@@ -2,7 +2,7 @@ import { Relay } from '../relay/relay';
 import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 
-describe('Relay', () => {
+describe('Mailbox / Messages', () => {
   let testRelay: Relay;
   let Alice: Mailbox;
   let Bob: Mailbox;
