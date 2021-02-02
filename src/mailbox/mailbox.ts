@@ -94,7 +94,7 @@ export class Mailbox {
    * Generates and stores a pair of keys required to start a relay session.
    * Each session with each Zax relay creates its own temporary session keys
    */
-  async createSessionKey(sessionId: string, forceNew: boolean): Promise<Keys> {
+  private async createSessionKey(sessionId: string, forceNew?: boolean): Promise<Keys> {
     const existingKey = this.sessionKeys.get(sessionId);
     if (!forceNew && existingKey) {
       return existingKey;
@@ -144,6 +144,7 @@ export class Mailbox {
   /**
    * Sends a free-form object to a guest we already have in our keyring
    */
+  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
@@ -331,6 +332,7 @@ export class Mailbox {
   /**
    * Encrypts the payload of the command and sends it to a relay
    */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.getHpk();
@@ -355,6 +357,7 @@ export class Mailbox {
    * added to the keyring. If the session flag is set, we will look for keys in
    * temporary, not the persistent collection of session keys
    */
+  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   async encodeMessage(guest: string, message: any, session = false): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
@@ -378,7 +381,7 @@ export class Mailbox {
   /**
    * Encodes a binary message with `cryptobox`
    */
-  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
+  private async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
     skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
     const nonce = await this.makeNonce(nonceData);
     const ctext = await this.nacl.crypto_box(message, nonce, pkTo, skFrom);
@@ -393,6 +396,7 @@ export class Mailbox {
    * nonce. If session flag is set, looks for keys in temporary, not the
    * persistent collection of session keys
    */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64, session = false): Promise<any> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
@@ -413,7 +417,8 @@ export class Mailbox {
   /**
    * Decodes a binary message with `cryptobox_open`
    */
-  async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
+  private async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array,
+    pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
     const data = await this.nacl.crypto_box_open(ctext, nonce, pkFrom, skTo);
     if (data) {
       const utf8 = await this.nacl.decode_utf8(data);
@@ -426,7 +431,7 @@ export class Mailbox {
   /**
    * Encodes a binary message with `secretbox` (used for file chunk encryption)
    */
-  async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array): Promise<EncryptedMessage> {
+  private async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array): Promise<EncryptedMessage> {
     const nonce = await this.makeNonce();
     const ctext = await this.nacl.crypto_secretbox(message, nonce, secretKey);
     return {
@@ -438,7 +443,8 @@ export class Mailbox {
   /**
    * Decodes a binary message with `secretbox_open` (used for file chunk decryption)
    */
-  async decodeMessageSymmetric(nonce: Base64, ctext: Base64, secretKey: Uint8Array): Promise<Uint8Array | null> {
+  private async decodeMessageSymmetric(nonce: Base64, ctext: Base64,
+    secretKey: Uint8Array): Promise<Uint8Array | null> {
     return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
 
