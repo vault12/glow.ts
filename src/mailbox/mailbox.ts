@@ -40,12 +40,8 @@ export class Mailbox {
     this.identity = identity;
   }
 
-  static async new(id: string, backup?: string): Promise<Mailbox> {
-    const nacl = NaCl.getInstance();
-    const keyRing = backup ? await KeyRing.fromBackup(id, backup) : await KeyRing.new(id);
-    const mbx = new Mailbox(nacl, keyRing, id);
-    mbx.identity = id;
-    return mbx;
+  static async new(identity: string): Promise<Mailbox> {
+    return new Mailbox(NaCl.getInstance(), await KeyRing.new(identity), identity);
   }
 
   // ---------- Alternative initializers ----------
@@ -71,8 +67,8 @@ export class Mailbox {
   /**
    * Create a Mailbox from the backup string
    */
-  static async fromBackup(id: string, backup: string): Promise<Mailbox> {
-    return await this.new(id, backup);
+  static async fromBackup(identity: string, backup: string): Promise<Mailbox> {
+    return new Mailbox(NaCl.getInstance(), await KeyRing.fromBackup(identity, backup), identity);
   }
 
   // ---------- Mailbox keys ----------
