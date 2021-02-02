@@ -1,7 +1,7 @@
 import { Relay } from '../relay/relay';
 import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
-import { randomNumber } from '../tests.helper';
+import { randomNumber, testRelayURL } from '../tests.helper';
 import { FileUploadMetadata } from '../zax.interface';
 
 describe('Mailbox / File transfer', () => {
@@ -21,7 +21,7 @@ describe('Mailbox / File transfer', () => {
   beforeAll(async () => {
     NaCl.setInstance();
 
-    testRelay = new Relay('https://z2.vault12.com');
+    testRelay = new Relay(testRelayURL);
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
     const aliceKey = Alice.getPubCommKey();

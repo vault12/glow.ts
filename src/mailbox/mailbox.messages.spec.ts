@@ -1,6 +1,7 @@
 import { Relay } from '../relay/relay';
 import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
+import { testRelayURL } from '../tests.helper';
 
 describe('Mailbox / Messages', () => {
   let testRelay: Relay;
@@ -11,7 +12,7 @@ describe('Mailbox / Messages', () => {
 
   beforeAll(async () => {
     NaCl.setInstance();
-    testRelay = new Relay('https://z2.vault12.com');
+    testRelay = new Relay(testRelayURL);
 
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
