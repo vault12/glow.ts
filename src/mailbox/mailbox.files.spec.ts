@@ -3,7 +3,6 @@ import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { randomNumber } from '../tests.helper';
 import { FileUploadMetadata } from '../zax.interface';
-import fs from 'fs';
 
 describe('Mailbox / File transfer', () => {
   let testRelay: Relay;
@@ -12,7 +11,7 @@ describe('Mailbox / File transfer', () => {
 
   let chunkSize: number;
   let numberOfChunks: number;
-  let file: Buffer;
+  let file: Uint8Array;
   let decodedFile: Uint8Array;
 
   let uploadID: string;
@@ -32,8 +31,8 @@ describe('Mailbox / File transfer', () => {
 
     await Alice.connectToRelay(testRelay);
 
-    file = fs.readFileSync('.test.zip');
-    expect(file.length).toBe(765);
+    // Generate a random binary file
+    file = new Uint8Array(randomNumber(500, 1000)).map(() => randomNumber(0, 255));
 
     // Arbitrary chunk size for testing purposes
     // NOTE: for big files `max_chunk_size` value of `startFileUpload` response should be considered
@@ -46,7 +45,7 @@ describe('Mailbox / File transfer', () => {
   it('start upload', async () => {
     metadata = {
       name: randomNumber(1, 100) + '.zip',
-      orig_size: 765,
+      orig_size: file.length,
       created: randomNumber(1480000000, 1520000000),
       modified: randomNumber(1480000000, 1520000000)
     };
@@ -63,7 +62,7 @@ describe('Mailbox / File transfer', () => {
 
   it('upload chunks', async () => {
     for (let i = 0; i < numberOfChunks; i++) {
-      const chunk = new Uint8Array(file.slice(i * chunkSize, (i + 1) * chunkSize));
+      const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
       const response = await Alice.uploadFileChunk(testRelay, uploadID, chunk, i, numberOfChunks, skey);
       expect(response).toHaveProperty('status');
       expect(response.status).toBe('OK');
@@ -73,16 +72,16 @@ describe('Mailbox / File transfer', () => {
   it('check file status and retrieve metadata', async () => {
     const statusAlice = await Alice.getFileStatus(testRelay, uploadID);
     expect(statusAlice.status).toBe('COMPLETE');
-    expect(statusAlice.file_size).toBe(765);
+    expect(statusAlice.file_size).toBe(file.length);
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
-    expect(statusAlice.bytes_stored).toBeGreaterThan(765);
+    expect(statusAlice.bytes_stored).toBeGreaterThan(file.length);
 
     await Bob.connectToRelay(testRelay);
     const statusBob = await Bob.getFileStatus(testRelay, uploadID);
     expect(statusBob.status).toBe('COMPLETE');
-    expect(statusAlice.file_size).toBe(765);
+    expect(statusAlice.file_size).toBe(file.length);
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
-    expect(statusAlice.bytes_stored).toBeGreaterThan(765);
+    expect(statusAlice.bytes_stored).toBeGreaterThan(file.length);
 
     const fetchedMetadata = await Bob.getFileMetadata(testRelay, uploadID);
     expect(fetchedMetadata).toEqual(metadata);
@@ -102,7 +101,7 @@ describe('Mailbox / File transfer', () => {
   });
 
   it('verify decoded file', async () => {
-    expect(decodedFile).toEqual(new Uint8Array(file));
+    expect(decodedFile).toEqual(file);
   });
 
   it('delete file', async () => {
