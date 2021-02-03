@@ -109,17 +109,15 @@ export class Mailbox {
    * communications with any relay. Returns the number of messages in the mailbox
    */
   async connectToRelay(relay: Relay): Promise<number> {
-    await relay.openConnection();
-    if (!relay.relayPublicKey || !relay.clientToken || !relay.relayToken) {
+    const relayPublicKey = await relay.openConnection();
+    if (!relay.clientToken || !relay.relayToken) {
       throw new Error('[Mailbox] No relay tokens found, run openConnection() first');
     }
 
     const key = await this.getSessionKey(relay.relayId(), true);
     const clientTempPk = Utils.fromBase64(key.publicKey);
 
-    await this.keyRing.addTempGuest(relay.relayId(), relay.relayPublicKey, config.RELAY_TOKEN_TIMEOUT);
-    // Now it belongs to the mailbox
-    delete relay.relayPublicKey;
+    await this.keyRing.addTempGuest(relay.relayId(), relayPublicKey, config.RELAY_TOKEN_TIMEOUT);
 
     //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
     const signature = new Uint8Array([...clientTempPk, ...relay.relayToken, ...relay.clientToken]);

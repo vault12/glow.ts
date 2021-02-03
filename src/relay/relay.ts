@@ -27,8 +27,7 @@ export class Relay {
   constructor(
     public url: string,
     public clientToken?: Uint8Array,
-    public relayToken?: Uint8Array,
-    public relayPublicKey?: Base64) {
+    public relayToken?: Uint8Array) {
     this.nacl = NaCl.getInstance();
     this.difficulty = 0;
   }
@@ -38,9 +37,9 @@ export class Relay {
   /**
    * Exchanges tokens with a relay and gets a temp session key for this relay
    */
-  async openConnection(): Promise<void> {
+  async openConnection(): Promise<Base64> {
     await this.fetchRelayToken();
-    await this.fetchRelayPublicKey();
+    return await this.getRelayPublicKey();
   }
 
   /**
@@ -67,7 +66,7 @@ export class Relay {
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  private async fetchRelayPublicKey(): Promise<void> {
+  private async getRelayPublicKey(): Promise<Base64> {
     if (!this.clientToken || !this.relayToken) {
       throw new Error('[Relay] No tokens found, fetch them from the relay first');
     }
@@ -87,7 +86,7 @@ export class Relay {
     // We confirm handshake by sending back h2(clientToken, relay_token)
     const relayPk = await this.httpCall('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     // Relay gives us back temp session key masked by clientToken we started with
-    this.relayPublicKey = relayPk;
+    return relayPk;
   }
 
   /**
