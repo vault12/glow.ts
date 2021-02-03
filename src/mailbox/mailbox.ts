@@ -92,9 +92,10 @@ export class Mailbox {
 
   /**
    * Generates and stores a pair of keys required to start a relay session.
+   * If keys were generated earlier, returns the stored keys.
    * Each session with each Zax relay creates its own temporary session keys
    */
-  private async createSessionKey(sessionId: string, forceNew?: boolean): Promise<Keys> {
+  private async getSessionKey(sessionId: string, forceNew?: boolean): Promise<Keys> {
     const existingKey = this.sessionKeys.get(sessionId);
     if (!forceNew && existingKey) {
       return existingKey;
@@ -117,7 +118,7 @@ export class Mailbox {
       throw new Error('[Mailbox] No relay tokens found, run openConnection() first');
     }
 
-    const key = await this.createSessionKey(relay.relayId(), true);
+    const key = await this.getSessionKey(relay.relayId(), true);
     const clientTempPk = Utils.fromBase64(key.publicKey);
 
     await this.keyRing.addTempGuest(relay.relayId(), relay.relayPublicKey);

@@ -39,7 +39,7 @@ export interface ZaxTextMessage {
    * Decoded object after JSON.parse
    */
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  data: object;
+  data: any;
   time: number;
   senderTag: string;
   nonce: Base64;

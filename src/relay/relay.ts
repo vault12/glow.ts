@@ -39,14 +39,14 @@ export class Relay {
    * Exchanges tokens with a relay and gets a temp session key for this relay
    */
   async openConnection(): Promise<void> {
-    await this.getRelayToken();
-    await this.getRelayPublicKey();
+    await this.fetchRelayToken();
+    await this.fetchRelayPublicKey();
   }
 
   /**
    * Sends a client token to a relay and saves a relay token
    */
-  private async getRelayToken(): Promise<void> {
+  private async fetchRelayToken(): Promise<void> {
     // Generate a client token. It will be used as part of handshake id with relay
     if (!this.clientToken) {
       this.clientToken = await this.nacl.random_bytes(config.RELAY_TOKEN_LEN);
@@ -67,7 +67,7 @@ export class Relay {
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  async getRelayPublicKey(): Promise<void> {
+  private async fetchRelayPublicKey(): Promise<void> {
     if (!this.clientToken || !this.relayToken) {
       throw new Error('[Relay] No tokens found, fetch them from the relay first');
     }
@@ -152,10 +152,7 @@ export class Relay {
    * Parses relay response and throws an error if its format is unexpected
    */
   private parseResponse(command: string, rawResponse: string): string[] {
-    let response = rawResponse.split('\r\n');
-    if (response.length < 2) {
-      response = rawResponse.split('\n');
-    }
+    const response = rawResponse.split('\r\n');
 
     if (!rawResponse || !this.validateResponse(command, response.length)) {
       throw new Error(`[Relay] ${this.url} - ${command}: Bad response`);
