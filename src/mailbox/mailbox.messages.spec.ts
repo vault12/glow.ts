@@ -28,10 +28,8 @@ describe('Mailbox / Messages', () => {
     const wrongRecipient = Alice.upload(testRelay, 'Carl', 'some message');
     expect(wrongRecipient).rejects.toThrow(Error);
 
-    const stat = await Alice.upload(testRelay, 'Bob', 'some message');
-    expect(stat.token.length).toBeGreaterThan(0);
-    nonce = stat.nonce;
-    token = stat.token;
+    token = await Alice.upload(testRelay, 'Bob', 'some message');
+    expect(token.length).toBeGreaterThan(0);
     const ttl = await Alice.messageStatus(testRelay, token);
     expect(ttl).toBeGreaterThan(0);
   });
@@ -44,6 +42,7 @@ describe('Mailbox / Messages', () => {
   it('download Bob mailbox', async () => {
     const downloaded = await Bob.download(testRelay);
     const message = downloaded[0];
+    nonce = message.nonce;
     expect(message.data).toBe('some message');
   });
 
@@ -60,5 +59,14 @@ describe('Mailbox / Messages', () => {
   it('check deleted message status', async () => {
     const ttl = await Alice.messageStatus(testRelay, token);
     expect(ttl).toBe(0); // the key is missing on the relay
+  });
+
+  it('send unencrypted message', async () => {
+    const token = await Alice.upload(testRelay, 'Bob', 'some unencrypted message', false);
+    expect(token.length).toBeGreaterThan(0);
+    const count = await Bob.count(testRelay);
+    expect(count).toBe(1);
+    const [ message ] = await Bob.download(testRelay);
+    expect(message.data).toBe('some unencrypted message');
   });
 });

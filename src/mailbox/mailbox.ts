@@ -18,11 +18,6 @@ import {
 } from '../zax.interface';
 import { Keys } from '../keys/keys';
 
-interface UploadedMessageData {
-  token: Base64;
-  nonce: Base64;
-}
-
 /**
  * Mailbox class represents a wrapper around a Keyring that allows to exchange
  * encrypted messages with other Mailboxes via a relay
@@ -143,20 +138,22 @@ export class Mailbox {
   // ---------- Relay message commands (public API) ----------
 
   /**
-   * Sends a free-form object to a guest we already have in our keyring
+   * Sends a free-form object to a guest we already have in our keyring. Set `encrypt` to `false` to
+   * send a plaintext message. Returns a token that can be used with `messageStatus` command to check
+   * the status of the message
    */
   /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
-  async upload(relay: Relay, guestKey: string, message: any): Promise<UploadedMessageData> {
+  async upload(relay: Relay, guestKey: string, message: any, encrypt = true): Promise<Base64> {
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
       throw new Error(`[Mailbox] upload: Don't know guest ${guestKey}`);
     }
 
-    const payload = await this.encodeMessage(guestKey, message);
+    const payload = encrypt ? await this.encodeMessage(guestKey, message) : message;
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
     const [token] = await this.runRelayCommand(relay, 'upload', { to: toHpk, payload });
-    return { token, nonce: payload.nonce };
+    return token;
   }
 
   /**
@@ -203,11 +200,15 @@ export class Mailbox {
   }
 
   /**
-   * Decrypts a regular encrypted Zax message
+   * Attempts to decrypt a regular encrypted Zax message. Returns plain message if it was sent encrypted
    */
   private async parseTextMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxTextMessage> {
-    const data = await this.decodeMessage(senderTag, message.nonce, message.data);
-    return({ data, time: message.time, senderTag, nonce: message.nonce, kind: 'message' });
+    let data = await this.decodeMessage(senderTag, message.nonce, message.data);
+    // If the message was sent unencrypted, the line above will return `null`
+    if (!data) {
+      data = message.data;
+    }
+    return ({ data, time: message.time, senderTag, nonce: message.nonce, kind: 'message' });
   }
 
   /**
