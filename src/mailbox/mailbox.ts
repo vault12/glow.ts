@@ -2,6 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
+import { config } from '../config';
 import { EncryptedMessage, Relay } from '../relay/relay';
 import {
   StartFileUploadResponse,
@@ -116,7 +117,7 @@ export class Mailbox {
     const key = await this.getSessionKey(relay.relayId(), true);
     const clientTempPk = Utils.fromBase64(key.publicKey);
 
-    await this.keyRing.addTempGuest(relay.relayId(), relay.relayPublicKey);
+    await this.keyRing.addTempGuest(relay.relayId(), relay.relayPublicKey, config.RELAY_TOKEN_TIMEOUT);
     // Now it belongs to the mailbox
     delete relay.relayPublicKey;
 

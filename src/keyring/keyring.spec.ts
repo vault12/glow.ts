@@ -2,7 +2,6 @@ import { KeyRing } from './keyring';
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { Keys } from '../keys/keys';
-import { config } from '../config';
 import { Utils } from '../utils/utils';
 
 describe('Keyring', () => {
@@ -68,15 +67,11 @@ describe('Keyring', () => {
 
   it('temporary keys', async () => {
     jest.useFakeTimers();
-    // mock config value
-    config.RELAY_SESSION_TIMEOUT = 100;
     const ring = await KeyRing.new('test5');
     const keys = new Keys(await nacl.crypto_box_keypair());
-    await ring.addTempGuest('temp', keys.publicKey);
+    await ring.addTempGuest('temp', keys.publicKey, 100);
     // the key has to exist before we run the timer
     expect(ring.getGuestKey('temp')).not.toBeNull();
-    // the key should not have expired yet
-    expect(ring.getTimeToGuestExpiration('temp')).toBeGreaterThan(0);
 
     jest.runAllTimers();
 
@@ -84,6 +79,5 @@ describe('Keyring', () => {
     expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), 100);
     // the key and timeout are erased
     expect(ring.getNumberOfGuests()).toBe(0);
-    expect(ring.getTimeToGuestExpiration('temp')).toBe(0);
   });
 });

@@ -95,15 +95,6 @@ export class KeyRing {
     return null;
   }
 
-  getTimeToGuestExpiration(guestTag: string): number {
-    const timeout = this.guestKeyTimeouts.get(guestTag);
-    if (timeout) {
-      return Math.max(0, config.RELAY_SESSION_TIMEOUT - (Date.now() - timeout.startTime));
-    } else {
-      return 0;
-    }
-  }
-
   // Backups
 
   async backup(): Promise<string> {
@@ -145,8 +136,8 @@ export class KeyRing {
     return await this.processGuest(guestTag, publicKey);
   }
 
-  async addTempGuest(guestTag: string, publicKey: Base64): Promise<string> {
-    return await this.processGuest(guestTag, publicKey, true);
+  async addTempGuest(guestTag: string, publicKey: Base64, ttl: number): Promise<string> {
+    return await this.processGuest(guestTag, publicKey, ttl);
   }
 
   async removeGuest(guestTag: string): Promise<boolean> {
@@ -157,21 +148,21 @@ export class KeyRing {
     return true;
   }
 
-  private async processGuest(guestTag: string, publicKey: Base64, isTemporary?: boolean): Promise<string> {
+  private async processGuest(guestTag: string, publicKey: Base64, ttl?: number): Promise<string> {
     const b64_h2 = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(publicKey)));
     this.guestKeys.set(guestTag, {
       pk: publicKey,
       hpk: b64_h2,
-      temp: !!isTemporary
+      temp: !!ttl
     });
-    if (isTemporary) {
-      this.setKeyTimeout(guestTag);
+    if (ttl) {
+      this.setKeyTimeout(guestTag, ttl);
       await this.saveGuests();
     }
     return b64_h2;
   }
 
-  private setKeyTimeout(guestTag: string) {
+  private setKeyTimeout(guestTag: string, ttl: number) {
     const existingTimeout = this.guestKeyTimeouts.get(guestTag);
     if (existingTimeout) {
       clearTimeout(existingTimeout.timeoutId);
@@ -180,7 +171,7 @@ export class KeyRing {
     const newTimeoutId = setTimeout(() => {
       this.guestKeys.delete(guestTag);
       this.guestKeyTimeouts.delete(guestTag);
-    }, config.RELAY_SESSION_TIMEOUT);
+    }, ttl);
 
     this.guestKeyTimeouts.set(guestTag, {
       timeoutId: newTimeoutId,
