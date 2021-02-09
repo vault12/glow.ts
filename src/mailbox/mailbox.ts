@@ -112,9 +112,6 @@ export class Mailbox {
   async connectToRelay(url: string): Promise<number> {
     const relay = RelaysService.getRelay(url);
     const relayPublicKey = await relay.openConnection();
-    if (!relay.clientToken || !relay.relayToken) {
-      throw new Error('[Mailbox] No relay tokens found, run openConnection() first');
-    }
 
     const key = await this.getSessionKey(relay.relayId(), true);
     const clientTempPk = Utils.fromBase64(key.publicKey);

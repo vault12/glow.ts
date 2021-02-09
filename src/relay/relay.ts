@@ -26,8 +26,8 @@ export class Relay {
 
   constructor(
     public url: string,
-    public clientToken?: Uint8Array,
-    public relayToken?: Uint8Array) {
+    public clientToken: Uint8Array,
+    public relayToken: Uint8Array) {
     this.nacl = NaCl.getInstance();
     this.difficulty = 0;
   }
