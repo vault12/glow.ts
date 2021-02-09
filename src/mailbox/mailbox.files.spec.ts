@@ -1,11 +1,10 @@
-import { Relay } from '../relay/relay';
 import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { randomNumber, testRelayURL } from '../tests.helper';
 import { FileUploadMetadata } from '../zax.interface';
 
 describe('Mailbox / File transfer', () => {
-  let testRelay: Relay;
+
   let Alice: Mailbox;
   let Bob: Mailbox;
 
@@ -21,7 +20,6 @@ describe('Mailbox / File transfer', () => {
   beforeAll(async () => {
     NaCl.setInstance();
 
-    testRelay = new Relay(testRelayURL);
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
     const aliceKey = Alice.getPubCommKey();
@@ -29,7 +27,7 @@ describe('Mailbox / File transfer', () => {
     await Alice.keyRing.addGuest('Bob', bobKey);
     await Bob.keyRing.addGuest('Alice', aliceKey);
 
-    await Alice.connectToRelay(testRelay);
+    await Alice.connectToRelay(testRelayURL);
 
     // Generate a random binary file
     file = new Uint8Array(randomNumber(500, 1000)).map(() => randomNumber(0, 255));
@@ -49,7 +47,7 @@ describe('Mailbox / File transfer', () => {
       created: randomNumber(1480000000, 1520000000),
       modified: randomNumber(1480000000, 1520000000)
     };
-    const response = await Alice.startFileUpload('Bob', testRelay, metadata);
+    const response = await Alice.startFileUpload('Bob', testRelayURL, metadata);
 
     expect(response).toHaveProperty('uploadID');
     expect(response).toHaveProperty('max_chunk_size');
@@ -63,27 +61,27 @@ describe('Mailbox / File transfer', () => {
   it('upload chunks', async () => {
     for (let i = 0; i < numberOfChunks; i++) {
       const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
-      const response = await Alice.uploadFileChunk(testRelay, uploadID, chunk, i, numberOfChunks, skey);
+      const response = await Alice.uploadFileChunk(testRelayURL, uploadID, chunk, i, numberOfChunks, skey);
       expect(response).toHaveProperty('status');
       expect(response.status).toBe('OK');
     }
   });
 
   it('check file status and retrieve metadata', async () => {
-    const statusAlice = await Alice.getFileStatus(testRelay, uploadID);
+    const statusAlice = await Alice.getFileStatus(testRelayURL, uploadID);
     expect(statusAlice.status).toBe('COMPLETE');
     expect(statusAlice.file_size).toBe(file.length);
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
     expect(statusAlice.bytes_stored).toBeGreaterThan(file.length);
 
-    await Bob.connectToRelay(testRelay);
-    const statusBob = await Bob.getFileStatus(testRelay, uploadID);
+    await Bob.connectToRelay(testRelayURL);
+    const statusBob = await Bob.getFileStatus(testRelayURL, uploadID);
     expect(statusBob.status).toBe('COMPLETE');
     expect(statusAlice.file_size).toBe(file.length);
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
     expect(statusAlice.bytes_stored).toBeGreaterThan(file.length);
 
-    const fetchedMetadata = await Bob.getFileMetadata(testRelay, uploadID);
+    const fetchedMetadata = await Bob.getFileMetadata(testRelayURL, uploadID);
     expect(fetchedMetadata).toEqual(metadata);
   });
 
@@ -91,7 +89,7 @@ describe('Mailbox / File transfer', () => {
     decodedFile = new Uint8Array(file.length);
     let downloadedBytes = 0;
     for (let i = 0; i < numberOfChunks; i++) {
-      const chunk = await Bob.downloadFileChunk(testRelay, uploadID, i, skey);
+      const chunk = await Bob.downloadFileChunk(testRelayURL, uploadID, i, skey);
       if (!chunk) {
         throw new Error('Error downloading chunk');
       }
@@ -105,7 +103,7 @@ describe('Mailbox / File transfer', () => {
   });
 
   it('delete file', async () => {
-    const response = await Bob.deleteFile(testRelay, uploadID);
+    const response = await Bob.deleteFile(testRelayURL, uploadID);
     expect(response.status).toEqual('OK');
   });
 });

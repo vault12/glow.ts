@@ -18,6 +18,7 @@ import {
   ParsedZaxMessage
 } from '../zax.interface';
 import { Keys } from '../keys/keys';
+import { RelaysService } from '../relay/relays.service';
 
 /**
  * Mailbox class represents a wrapper around a Keyring that allows to exchange
@@ -108,7 +109,8 @@ export class Mailbox {
    * Mailbox to this specific relay. This is the first function to start
    * communications with any relay. Returns the number of messages in the mailbox
    */
-  async connectToRelay(relay: Relay): Promise<number> {
+  async connectToRelay(url: string): Promise<number> {
+    const relay = RelaysService.getRelay(url);
     const relayPublicKey = await relay.openConnection();
     if (!relay.clientToken || !relay.relayToken) {
       throw new Error('[Mailbox] No relay tokens found, run openConnection() first');
@@ -142,7 +144,8 @@ export class Mailbox {
    * the status of the message
    */
   /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
-  async upload(relay: Relay, guestKey: string, message: any, encrypt = true): Promise<Base64> {
+  async upload(url: string, guestKey: string, message: any, encrypt = true): Promise<Base64> {
+    const relay = RelaysService.getRelay(url);
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
       throw new Error(`[Mailbox] upload: Don't know guest ${guestKey}`);
@@ -161,7 +164,8 @@ export class Mailbox {
    * or if it can't be decrypted because HPK is missing in the keyring.
    * Returns an array of mixed messages
    */
-  async download(relay: Relay): Promise<ParsedZaxMessage[]> {
+  async download(url: string): Promise<ParsedZaxMessage[]> {
+    const relay = RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'download');
     const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
 
@@ -213,7 +217,8 @@ export class Mailbox {
   /**
    * Returns the number of messages in the mailbox on a given relay
    */
-  async count(relay: Relay): Promise<number> {
+  async count(url: string): Promise<number> {
+    const relay = RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'count');
     return await this.decryptResponse(relay, response);
   }
@@ -222,7 +227,8 @@ export class Mailbox {
   * Deletes messages from a relay given a list of base64 message nonces,
   * and returns the number of remaining messages
   */
-  async delete(relay: Relay, nonceList: Base64[]): Promise<number> {
+  async delete(url: string, nonceList: Base64[]): Promise<number> {
+    const relay = RelaysService.getRelay(url);
     const [response] = await this.runRelayCommand(relay, 'delete', { payload: nonceList });
     return parseInt(response, 10);
   }
@@ -231,7 +237,8 @@ export class Mailbox {
   * Gets the status of a previously sent Zax message by a storage token.
   * Returns "time to live" in seconds or 0 if the message is not found
   */
-  async messageStatus(relay: Relay, storageToken: Base64): Promise<number> {
+  async messageStatus(url: string, storageToken: Base64): Promise<number> {
+    const relay = RelaysService.getRelay(url);
     const [response] = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
     const status = parseInt(response, 10);
     if (status === MessageStatusResponse.MissingKey || status === MessageStatusResponse.NeverExpires) {
@@ -246,8 +253,9 @@ export class Mailbox {
    * Asks Zax to start a new upload session, and returns a unique file identifier
    * required to upload file chunks.
    */
-  async startFileUpload(guest: string, relay: Relay,
+  async startFileUpload(guest: string, url: string,
     rawMetadata: FileUploadMetadata): Promise<StartFileUploadResponse> {
+    const relay = RelaysService.getRelay(url);
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`[Mailbox] startFileUpload: Don't know guest ${guest}`);
@@ -274,8 +282,9 @@ export class Mailbox {
   /**
    * Encrypts the file chunk symmetrically and transfers it to a relay
    */
-  async uploadFileChunk(relay: Relay, uploadID: string, chunk: Uint8Array,
+  async uploadFileChunk(url: string, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
+    const relay = RelaysService.getRelay(url);
     const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
     const response = await this.runRelayCommand(relay, 'uploadFileChunk', {
       uploadID,
@@ -291,7 +300,8 @@ export class Mailbox {
    * to verify the correct transfer, and downloader can check if the file exists and retrieve
    * the number of chunks
    */
-  async getFileStatus(relay: Relay, uploadID: string): Promise<FileStatusResponse> {
+  async getFileStatus(url: string, uploadID: string): Promise<FileStatusResponse> {
+    const relay = RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'fileStatus', { uploadID });
     return await this.decryptResponse(relay, response);
   }
@@ -299,8 +309,8 @@ export class Mailbox {
   /**
    * Fetches the file metadata by uploadID, which was declared by the uploader
    */
-  async getFileMetadata(relay: Relay, uploadID: string): Promise<FileUploadMetadata> {
-    const messages = await this.download(relay);
+  async getFileMetadata(url: string, uploadID: string): Promise<FileUploadMetadata> {
+    const messages = await this.download(url);
 
     const fileMessage = messages
       .filter(message => message.kind === 'file')
@@ -312,7 +322,8 @@ export class Mailbox {
    * Downloads a binary chunk of a file from a relay by a given uploadID.  The total number of chunks
    * can be retrieved via a `getFileStatus` request
    */
-  async downloadFileChunk(relay: Relay, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
+  async downloadFileChunk(url: string, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
+    const relay = RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'downloadFileChunk', { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
     const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
@@ -323,7 +334,8 @@ export class Mailbox {
    * Deletes a file from the relay (or all chunks uploaded so far, if the upload was not completed).
    * Can be called by either the sender or recipient
    */
-  async deleteFile(relay: Relay, uploadID: string): Promise<DeleteFileResponse> {
+  async deleteFile(url: string, uploadID: string): Promise<DeleteFileResponse> {
+    const relay = RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'deleteFile', { uploadID });
     return await this.decryptResponse(relay, response);
   }
