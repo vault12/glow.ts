@@ -134,4 +134,53 @@ export class JsNaClDriver implements NaClDriver {
     extendedSource.set(data, 64);
     return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
   }
+
+  // ---------- Nonce helper ----------
+
+  /**
+   * Makes a timestamp nonce that a relay expects for any crypto operations.
+   * Timestamp is the first 8 bytes, the rest is random, unless custom `data`
+   * is specified. `data` will be packed as next 4 bytes after timestamp.
+   */
+  async makeNonce(data?: number): Promise<Uint8Array> {
+    const nonce = await this.crypto_box_random_nonce();
+    let headerLen;
+    if (nonce.length !== this.crypto_box_NONCEBYTES) {
+      throw new Error('[Mailbox] Wrong crypto_box nonce length');
+    }
+    // split timestamp integer as an array of bytes
+    headerLen = 8; // max timestamp size
+    const aTime = this.itoa(Math.floor(Date.now() / 1000));
+
+    if (data) {
+      headerLen += 4; // extra 4 bytes for custom data
+    }
+
+    // zero out nonce header area
+    nonce.fill(0, 0, headerLen);
+    // copy the timestamp into the first 8 bytes of nonce
+    nonce.set(aTime, 8 - aTime.length);
+    // copy data if present
+    if (data) {
+      const aData = this.itoa(data);
+      nonce.set(aData, 12 - aData.length);
+    }
+    return nonce;
+  }
+
+  /**
+   * Splits an integer into an array of bytes
+   */
+  private itoa(num: number): Uint8Array {
+    // calculate length first
+    let hex = num.toString(16);
+    hex = hex.length & 1 ? `0${hex}` : hex;
+    const len = hex.length / 2;
+    const byteArray = new Uint8Array(len);
+
+    for (let j = 0, i = 0; i < hex.length; i += 2, j++) {
+      byteArray[j] = parseInt(hex[i] + hex[i + 1], 16);
+    }
+    return byteArray;
+  }
 }

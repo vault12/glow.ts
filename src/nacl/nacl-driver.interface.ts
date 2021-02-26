@@ -29,4 +29,5 @@ export interface NaClDriver {
   from_hex(data: string): Promise<Uint8Array>;
 
   h2(data: string | Uint8Array): Promise<Uint8Array>;
+  makeNonce(data?: number): Promise<Uint8Array>;
 }
