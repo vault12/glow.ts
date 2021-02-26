@@ -23,13 +23,18 @@ export class Relay {
 
   private nacl: NaClDriver;
   private difficulty: number;
+  public relayToken?: Uint8Array;
 
-  constructor(
-    public url: string,
-    public clientToken: Uint8Array,
-    public relayToken: Uint8Array) {
+  private constructor(public url: string, public clientToken: Uint8Array) {
     this.nacl = NaCl.getInstance();
     this.difficulty = 0;
+  }
+
+  static async new(url: string): Promise<Relay> {
+    const nacl = NaCl.getInstance();
+    // Generate a client token. It will be used as part of handshake id with relay
+    const clientToken = await nacl.random_bytes(config.RELAY_TOKEN_LEN);
+    return new Relay(url, clientToken);
   }
 
   // ---------- Connection initialization ----------
@@ -46,11 +51,6 @@ export class Relay {
    * Sends a client token to a relay and saves a relay token
    */
   private async fetchRelayToken(): Promise<void> {
-    // Generate a client token. It will be used as part of handshake id with relay
-    if (!this.clientToken) {
-      this.clientToken = await this.nacl.random_bytes(config.RELAY_TOKEN_LEN);
-    }
-
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
 
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
@@ -67,8 +67,8 @@ export class Relay {
    * Completes the handshake and saves a relay pubic key
    */
   private async getRelayPublicKey(): Promise<Base64> {
-    if (!this.clientToken || !this.relayToken) {
-      throw new Error('[Relay] No tokens found, fetch them from the relay first');
+    if (!this.relayToken) {
+      throw new Error('[Relay] No relay token found, fetch it from the relay first');
     }
     // After clientToken is sent to the relay, we use only h2() of it
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
@@ -100,9 +100,6 @@ export class Relay {
    * Attaches a mailbox and fetches number of messages
    */
   async prove(payload: EncryptedMessage, publicKey: string): Promise<string> {
-    if (!this.clientToken) {
-      throw new Error('[Relay] No token found, run openConnection() first');
-    }
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
     return await this.httpCall('prove', h2ClientToken, publicKey, payload.nonce, payload.ctext);
   }

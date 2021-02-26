@@ -8,7 +8,7 @@ describe('Relay', () => {
   });
 
   it('initialize', async () => {
-    const testRelay = new Relay(testRelayURL);
+    const testRelay = await Relay.new(testRelayURL);
     await testRelay.openConnection();
     expect(testRelay.relayId()).toBe(`relay_#${testRelayURL}`);
   });

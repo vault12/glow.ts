@@ -6,10 +6,10 @@ export class RelaysService {
   /**
    * Returns a Relay instance for given URL, or creates a new one if wasn't initialized
    */
-  static getRelay(url: string): Relay {
+  static async getRelay(url: string): Promise<Relay> {
     let relay = this.relays[url];
     if (!relay) {
-      relay = this.relays[url] = new Relay(url);
+      relay = this.relays[url] = await Relay.new(url);
     }
     return relay;
   }
