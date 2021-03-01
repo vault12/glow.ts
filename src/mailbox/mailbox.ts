@@ -92,27 +92,20 @@ export class Mailbox {
    */
   async connectToRelay(url: string): Promise<number> {
     const relay = await RelaysService.getRelay(url);
-    await relay.openConnection();
-    if (!relay.relayToken || !relay.publicKey) {
-      throw new Error('[Mailbox] No relay tokens found, unknown error');
+    const h2Signature = await relay.openConnection();
+    if (!relay.publicKey) {
+      throw new Error('[Mailbox] No relay tokens found, connection error');
     }
-
-    const clientTempPk = Utils.fromBase64(relay.sessionKeys.publicKey);
 
     await this.keyRing.addTempGuest(relay.relayId(), relay.publicKey, config.RELAY_TOKEN_TIMEOUT);
 
-    //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
-    const signature = new Uint8Array([...clientTempPk, ...relay.relayToken, ...relay.clientToken]);
-    const h2Signature = await this.nacl.h2(signature);
     const encryptedSignature = await this.encodeMessage(relay.relayId(), h2Signature);
 
-    const payload = {
+    const messagesNumber = await relay.prove(await relay.encodeMessage({
       pub_key: this.keyRing.getPubCommKey(),
       nonce: encryptedSignature.nonce,
       ctext: encryptedSignature.ctext
-    };
-    const outer = await relay.encodeMessage(payload);
-    const messagesNumber = await relay.prove(outer, relay.sessionKeys.publicKey);
+    }));
     return parseInt(messagesNumber, 10);
   }
 

@@ -19,7 +19,6 @@ export class Relay {
 
   private nacl: NaClDriver;
   private difficulty: number;
-  public relayToken?: Uint8Array;
   public publicKey?: string;
 
   private constructor(public url: string, public clientToken: Uint8Array, public sessionKeys: Keys) {
@@ -40,40 +39,40 @@ export class Relay {
   // ---------- Connection initialization ----------
 
   /**
-   * Exchanges tokens with a relay and gets a temp session key for this relay
+   * Exchanges tokens with a relay and gets a temp session key for this relay.
+   * Returns h₂(signature)
    */
-  async openConnection(): Promise<void> {
-    await this.fetchRelayToken();
-    await this.fetchRelayPublicKey();
+  async openConnection(): Promise<Uint8Array> {
+    const relayToken = await this.fetchRelayToken();
+    await this.fetchRelayPublicKey(relayToken);
+    return await this.getSignature(relayToken);
   }
 
   /**
    * Sends a client token to a relay and saves a relay token
    */
-  private async fetchRelayToken(): Promise<void> {
+  private async fetchRelayToken(): Promise<Uint8Array> {
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
 
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
     const [token, difficulty] = this.parseResponse('start_session', data);
-    this.relayToken = Utils.fromBase64(token);
-    this.difficulty = parseInt(difficulty, 10);
 
+    this.difficulty = parseInt(difficulty, 10);
     if (this.difficulty > 10) {
       console.log(`[Relay] ${this.url} requested difficulty ${this.difficulty}. Session handshake may take longer.`);
     }
+
+    return Utils.fromBase64(token);
   }
 
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  private async fetchRelayPublicKey(): Promise<void> {
-    if (!this.relayToken) {
-      throw new Error('[Relay] No relay token found, fetch it from the relay first');
-    }
+  private async fetchRelayPublicKey(relayToken: Uint8Array): Promise<void> {
     // After clientToken is sent to the relay, we use only h2() of it
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
 
-    const handshake = new Uint8Array([...this.clientToken, ...this.relayToken]);
+    const handshake = new Uint8Array([...this.clientToken, ...relayToken]);
     let sessionHandshake: Uint8Array;
 
     // Compute session handshake based on difficulty level set by the server
@@ -99,9 +98,9 @@ export class Relay {
   /**
    * Attaches a mailbox and fetches number of messages
    */
-  async prove(payload: EncryptedMessage, publicKey: string): Promise<string> {
+  async prove(payload: EncryptedMessage): Promise<string> {
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
-    return await this.httpCall('prove', h2ClientToken, publicKey, payload.nonce, payload.ctext);
+    return await this.httpCall('prove', h2ClientToken, this.sessionKeys.publicKey, payload.nonce, payload.ctext);
   }
 
   /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
@@ -151,6 +150,14 @@ export class Relay {
 
     const response = await this.httpCall('command', ...payload);
     return this.parseResponse(command, response);
+  }
+
+  private async getSignature(relayToken: Uint8Array) {
+    const clientTempPk = Utils.fromBase64(this.sessionKeys.publicKey);
+    // Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
+    const signature = new Uint8Array([...clientTempPk, ...relayToken, ...this.clientToken]);
+    const h2Signature = await this.nacl.h2(signature);
+    return h2Signature;
   }
 
   /**
