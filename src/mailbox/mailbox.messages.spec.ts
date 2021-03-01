@@ -18,7 +18,6 @@ describe('Mailbox / Messages', () => {
     await Bob.keyRing.addGuest('Alice', Alice.getPubCommKey());
 
     await Alice.connectToRelay(testRelayURL);
-    await Bob.connectToRelay(testRelayURL);
   });
 
   it('send a message', async () => {
@@ -32,6 +31,7 @@ describe('Mailbox / Messages', () => {
   });
 
   it('count Bob mailbox', async () => {
+    await Bob.connectToRelay(testRelayURL);
     const count = await Bob.count(testRelayURL);
     expect(count).toBe(1);
   });
@@ -54,6 +54,7 @@ describe('Mailbox / Messages', () => {
   });
 
   it('check deleted message status', async () => {
+    await Alice.connectToRelay(testRelayURL);
     const ttl = await Alice.messageStatus(testRelayURL, token);
     expect(ttl).toBe(0); // the key is missing on the relay
   });
@@ -61,6 +62,7 @@ describe('Mailbox / Messages', () => {
   it('send unencrypted message', async () => {
     const token = await Alice.upload(testRelayURL, 'Bob', 'some unencrypted message', false);
     expect(token.length).toBeGreaterThan(0);
+    await Bob.connectToRelay(testRelayURL);
     const count = await Bob.count(testRelayURL);
     expect(count).toBe(1);
     const [ message ] = await Bob.download(testRelayURL);

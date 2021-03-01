@@ -17,7 +17,6 @@ import {
   ZaxTextMessage,
   ParsedZaxMessage
 } from '../zax.interface';
-import { Keys } from '../keys/keys';
 import { RelaysService } from '../relay/relays.service';
 
 /**
@@ -29,7 +28,6 @@ export class Mailbox {
   public identity: string;
 
   private nacl: NaClDriver;
-  private sessionKeys: Map<string, Keys> = new Map();
 
   private constructor(naclDriver: NaClDriver, keyRing: KeyRing, identity: string) {
     this.nacl = naclDriver;
@@ -88,38 +86,20 @@ export class Mailbox {
   }
 
   /**
-   * Generates and stores a pair of keys required to start a relay session.
-   * If keys were generated earlier, returns the stored keys.
-   * Each session with each Zax relay creates its own temporary session keys
-   */
-  private async getSessionKey(sessionId: string, forceNew?: boolean): Promise<Keys> {
-    const existingKey = this.sessionKeys.get(sessionId);
-    if (!forceNew && existingKey) {
-      return existingKey;
-    }
-
-    const keypair = await this.nacl.crypto_box_keypair();
-    const keys = new Keys(keypair);
-    this.sessionKeys.set(sessionId, keys);
-    return keys;
-  }
-
-  /**
    * Establishes a session, exchanges temp keys and proves our ownership of this
    * Mailbox to this specific relay. This is the first function to start
    * communications with any relay. Returns the number of messages in the mailbox
    */
   async connectToRelay(url: string): Promise<number> {
     const relay = await RelaysService.getRelay(url);
-    const relayPublicKey = await relay.openConnection();
-    if (!relay.relayToken) {
-      throw new Error('[Relay] No relay token found, fetch it from the relay first');
+    await relay.openConnection();
+    if (!relay.relayToken || !relay.publicKey) {
+      throw new Error('[Mailbox] No relay tokens found, unknown error');
     }
 
-    const key = await this.getSessionKey(relay.relayId(), true);
-    const clientTempPk = Utils.fromBase64(key.publicKey);
+    const clientTempPk = Utils.fromBase64(relay.sessionKeys.publicKey);
 
-    await this.keyRing.addTempGuest(relay.relayId(), relayPublicKey, config.RELAY_TOKEN_TIMEOUT);
+    await this.keyRing.addTempGuest(relay.relayId(), relay.publicKey, config.RELAY_TOKEN_TIMEOUT);
 
     //  Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
     const signature = new Uint8Array([...clientTempPk, ...relay.relayToken, ...relay.clientToken]);
@@ -131,8 +111,8 @@ export class Mailbox {
       nonce: encryptedSignature.nonce,
       ctext: encryptedSignature.ctext
     };
-    const outer = await this.encodeMessage(relay.relayId(), payload, true);
-    const messagesNumber = await relay.prove(outer, key.publicKey);
+    const outer = await relay.encodeMessage(payload);
+    const messagesNumber = await relay.prove(outer, relay.sessionKeys.publicKey);
     return parseInt(messagesNumber, 10);
   }
 
@@ -326,7 +306,7 @@ export class Mailbox {
     const relay = await RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'downloadFileChunk', { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
-    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
+    const decoded = await relay.decodeMessage(nonce, ctext);
     return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
@@ -349,7 +329,7 @@ export class Mailbox {
   private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.getHpk();
-    const message = await this.encodeMessage(relay.relayId(), params, true);
+    const message = await relay.encodeMessage(params);
     return await relay.runCmd(command, hpk, message, ctext);
   }
 
@@ -359,8 +339,7 @@ export class Mailbox {
    */
   private async decryptResponse(relay: Relay, response: string[]) {
     const [nonce, ctext] = response;
-    const decoded = await this.decodeMessage(relay.relayId(), nonce, ctext, true);
-    return decoded;
+    return await relay.decodeMessage(nonce, ctext);
   }
 
   // ---------- Message encoding / decoding ----------
@@ -371,18 +350,13 @@ export class Mailbox {
    * temporary, not the persistent collection of session keys
    */
   /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
-  async encodeMessage(guest: string, message: any, session = false): Promise<EncryptedMessage> {
+  async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`[Mailbox] encodeMessage: Don't know guest ${guest}`);
     }
 
-    let privateKey = this.keyRing.commKey.privateKey;
-
-    const sessionKey = this.sessionKeys.get(guest);
-    if (session && sessionKey) {
-      privateKey = sessionKey.privateKey;
-    }
+    const privateKey = this.keyRing.commKey.privateKey;
 
     if (!(message instanceof Uint8Array)) {
       message = await this.nacl.encode_utf8(JSON.stringify(message));
@@ -397,18 +371,13 @@ export class Mailbox {
    * persistent collection of session keys
    */
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  async decodeMessage(guest: string, nonce: Base64, ctext: Base64, session = false): Promise<any> {
+  async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
       throw new Error(`[Mailbox] decodeMessage: Don't know guest ${guest}`);
     }
 
-    let privateKey = this.keyRing.commKey.privateKey;
-
-    const sessionKey = this.sessionKeys.get(guest);
-    if (session && sessionKey) {
-      privateKey = sessionKey.privateKey;
-    }
+    const privateKey = this.keyRing.commKey.privateKey;
 
     return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));

@@ -4,6 +4,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
+import { Keys } from '../keys/keys';
 
 /**
  * Low-level operations with Zax relay
@@ -19,8 +20,9 @@ export class Relay {
   private nacl: NaClDriver;
   private difficulty: number;
   public relayToken?: Uint8Array;
+  public publicKey?: string;
 
-  private constructor(public url: string, public clientToken: Uint8Array) {
+  private constructor(public url: string, public clientToken: Uint8Array, public sessionKeys: Keys) {
     this.nacl = NaCl.getInstance();
     this.difficulty = 0;
   }
@@ -29,7 +31,10 @@ export class Relay {
     const nacl = NaCl.getInstance();
     // Generate a client token. It will be used as part of handshake id with relay
     const clientToken = await nacl.random_bytes(config.RELAY_TOKEN_LEN);
-    return new Relay(url, clientToken);
+    // Generate and store a pair of keys required to start a relay session.
+    // Each session with each Zax relay creates its own temporary session keys
+    const sessionKeys = new Keys(await nacl.crypto_box_keypair());
+    return new Relay(url, clientToken, sessionKeys);
   }
 
   // ---------- Connection initialization ----------
@@ -37,9 +42,9 @@ export class Relay {
   /**
    * Exchanges tokens with a relay and gets a temp session key for this relay
    */
-  async openConnection(): Promise<Base64> {
+  async openConnection(): Promise<void> {
     await this.fetchRelayToken();
-    return await this.getRelayPublicKey();
+    await this.fetchRelayPublicKey();
   }
 
   /**
@@ -61,7 +66,7 @@ export class Relay {
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  private async getRelayPublicKey(): Promise<Base64> {
+  private async fetchRelayPublicKey(): Promise<void> {
     if (!this.relayToken) {
       throw new Error('[Relay] No relay token found, fetch it from the relay first');
     }
@@ -81,7 +86,7 @@ export class Relay {
     // We confirm handshake by sending back h2(clientToken, relay_token)
     const relayPk = await this.httpCall('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     // Relay gives us back temp session key masked by clientToken we started with
-    return relayPk;
+    this.publicKey = relayPk;
   }
 
   /**
@@ -97,6 +102,33 @@ export class Relay {
   async prove(payload: EncryptedMessage, publicKey: string): Promise<string> {
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
     return await this.httpCall('prove', h2ClientToken, publicKey, payload.nonce, payload.ctext);
+  }
+
+  async encodeMessage(message: any): Promise<EncryptedMessage> {
+    const relayPk = this.publicKey;
+    if (!relayPk) {
+      throw new Error('[Relay] No relay public key found, open the connection first');
+    }
+
+    const privateKey = this.sessionKeys.privateKey;
+
+    if (!(message instanceof Uint8Array)) {
+      message = await this.nacl.encode_utf8(JSON.stringify(message));
+    }
+
+    return await this.nacl.rawEncodeMessage(message, Utils.fromBase64(relayPk), Utils.fromBase64(privateKey));
+  }
+
+  async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
+    const relayPk = this.publicKey;
+    if (!relayPk) {
+      throw new Error('[Relay] No relay public key found, open the connection first');
+    }
+
+    const privateKey = this.sessionKeys.privateKey;
+
+    return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+      Utils.fromBase64(relayPk), Utils.fromBase64(privateKey));
   }
 
   // ---------- Low-level server request handling ----------
