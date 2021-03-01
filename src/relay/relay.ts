@@ -104,6 +104,7 @@ export class Relay {
     return await this.httpCall('prove', h2ClientToken, publicKey, payload.nonce, payload.ctext);
   }
 
+  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   async encodeMessage(message: any): Promise<EncryptedMessage> {
     const relayPk = this.publicKey;
     if (!relayPk) {
@@ -119,6 +120,7 @@ export class Relay {
     return await this.nacl.rawEncodeMessage(message, Utils.fromBase64(relayPk), Utils.fromBase64(privateKey));
   }
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
     const relayPk = this.publicKey;
     if (!relayPk) {
