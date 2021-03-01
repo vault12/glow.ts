@@ -1,9 +1,9 @@
 import { NaCl } from '../nacl/nacl';
-import { NaClDriver } from '../nacl/nacl-driver.interface';
+import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
 import { config } from '../config';
-import { EncryptedMessage, Relay } from '../relay/relay';
+import { Relay } from '../relay/relay';
 import {
   StartFileUploadResponse,
   UploadFileChunkResponse,
@@ -388,20 +388,7 @@ export class Mailbox {
       message = await this.nacl.encode_utf8(JSON.stringify(message));
     }
 
-    return await this.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
-  }
-
-  /**
-   * Encodes a binary message with `cryptobox`
-   */
-  private async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
-    skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
-    const nonce = await this.nacl.makeNonce(nonceData);
-    const ctext = await this.nacl.crypto_box(message, nonce, pkTo, skFrom);
-    return {
-      nonce: Utils.toBase64(nonce),
-      ctext: Utils.toBase64(ctext)
-    };
+    return await this.nacl.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   /**
@@ -423,22 +410,8 @@ export class Mailbox {
       privateKey = sessionKey.privateKey;
     }
 
-    return await this.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+    return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
-  }
-
-  /**
-   * Decodes a binary message with `cryptobox_open`
-   */
-  private async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array,
-    pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
-    const data = await this.nacl.crypto_box_open(ctext, nonce, pkFrom, skTo);
-    if (data) {
-      const utf8 = await this.nacl.decode_utf8(data);
-      return JSON.parse(utf8);
-    }
-
-    return data;
   }
 
   /**

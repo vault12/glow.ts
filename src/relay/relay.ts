@@ -1,14 +1,9 @@
 import axios, { AxiosRequestConfig } from 'axios';
 
 import { NaCl } from '../nacl/nacl';
-import { NaClDriver } from '../nacl/nacl-driver.interface';
+import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
-
-export interface EncryptedMessage {
-  nonce: Base64;
-  ctext: Base64;
-}
 
 /**
  * Low-level operations with Zax relay

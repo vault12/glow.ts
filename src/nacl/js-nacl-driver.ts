@@ -1,8 +1,10 @@
 import { box, BoxKeyPair, randomBytes, secretbox, hash } from 'tweetnacl';
 import { sha256 } from 'js-sha256';
 
-import { NaClDriver } from './nacl-driver.interface';
+import { Utils } from '../utils/utils';
+import { NaClDriver, EncryptedMessage } from './nacl-driver.interface';
 import { Keypair } from './keypair.interface';
+
 
 /**
  * Implementation based on TweetNaCl.js: {@link https://github.com/dchest/tweetnacl-js}.
@@ -133,6 +135,35 @@ export class JsNaClDriver implements NaClDriver {
     extendedSource.fill(0);
     extendedSource.set(data, 64);
     return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
+  }
+
+  // ---------- Encoding wrappers ----------
+
+  /**
+   * Encodes a binary message with `cryptobox`
+   */
+  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
+    skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
+    const nonce = await this.makeNonce(nonceData);
+    const ctext = await this.crypto_box(message, nonce, pkTo, skFrom);
+    return {
+      nonce: Utils.toBase64(nonce),
+      ctext: Utils.toBase64(ctext)
+    };
+  }
+
+  /**
+   * Decodes a binary message with `cryptobox_open`
+   */
+  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
+  async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
+    const data = await this.crypto_box_open(ctext, nonce, pkFrom, skTo);
+    if (data) {
+      const utf8 = await this.decode_utf8(data);
+      return JSON.parse(utf8);
+    }
+
+    return data;
   }
 
   // ---------- Nonce helper ----------
