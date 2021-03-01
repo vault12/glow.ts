@@ -2,8 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
-import { config } from '../config';
-import { Relay } from '../relay/relay';
+import { Relay, ConnectionData } from '../relay/relay';
 import {
   StartFileUploadResponse,
   UploadFileChunkResponse,
@@ -92,14 +91,8 @@ export class Mailbox {
    */
   async connectToRelay(url: string): Promise<number> {
     const relay = await RelaysService.getRelay(url);
-    const h2Signature = await relay.openConnection();
-    if (!relay.publicKey) {
-      throw new Error('[Mailbox] No relay tokens found, connection error');
-    }
-
-    await this.keyRing.addTempGuest(relay.relayId(), relay.publicKey, config.RELAY_TOKEN_TIMEOUT);
-
-    const encryptedSignature = await this.encodeMessage(relay.relayId(), h2Signature);
+    const connectionData = await relay.openConnection();
+    const encryptedSignature = await this.encryptSignature(connectionData);
 
     const messagesNumber = await relay.prove(await relay.encodeMessage({
       pub_key: this.keyRing.getPubCommKey(),
@@ -107,6 +100,11 @@ export class Mailbox {
       ctext: encryptedSignature.ctext
     }));
     return parseInt(messagesNumber, 10);
+  }
+
+  private async encryptSignature(connectionData: ConnectionData) {
+    const privateKey = Utils.fromBase64(this.keyRing.commKey.privateKey);
+    return await this.nacl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
   }
 
   // ---------- Relay message commands (public API) ----------

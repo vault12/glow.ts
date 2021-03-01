@@ -6,6 +6,11 @@ import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 
+export interface ConnectionData {
+  h2Signature: Uint8Array;
+  relayPublicKey: Uint8Array;
+}
+
 /**
  * Low-level operations with Zax relay
  */
@@ -19,9 +24,9 @@ export class Relay {
 
   private nacl: NaClDriver;
   private difficulty: number;
-  public publicKey?: string;
+  private publicKey?: Uint8Array;
 
-  private constructor(public url: string, public clientToken: Uint8Array, public sessionKeys: Keys) {
+  private constructor(public url: string, private clientToken: Uint8Array, private sessionKeys: Keys) {
     this.nacl = NaCl.getInstance();
     this.difficulty = 0;
   }
@@ -42,10 +47,13 @@ export class Relay {
    * Exchanges tokens with a relay and gets a temp session key for this relay.
    * Returns h₂(signature)
    */
-  async openConnection(): Promise<Uint8Array> {
+  async openConnection(): Promise<ConnectionData> {
     const relayToken = await this.fetchRelayToken();
-    await this.fetchRelayPublicKey(relayToken);
-    return await this.getSignature(relayToken);
+    const relayPublicKey = await this.fetchRelayPublicKey(relayToken);
+    return {
+      h2Signature: await this.getSignature(relayToken),
+      relayPublicKey
+    };
   }
 
   /**
@@ -68,7 +76,7 @@ export class Relay {
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  private async fetchRelayPublicKey(relayToken: Uint8Array): Promise<void> {
+  private async fetchRelayPublicKey(relayToken: Uint8Array): Promise<Uint8Array> {
     // After clientToken is sent to the relay, we use only h2() of it
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
 
@@ -85,14 +93,8 @@ export class Relay {
     // We confirm handshake by sending back h2(clientToken, relay_token)
     const relayPk = await this.httpCall('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     // Relay gives us back temp session key masked by clientToken we started with
-    this.publicKey = relayPk;
-  }
-
-  /**
-   * Returns an ID for a relay (for encryption purposes)
-   */
-  relayId(): string {
-    return `relay_#${this.url}`;
+    this.publicKey = Utils.fromBase64(relayPk);
+    return this.publicKey;
   }
 
   /**
@@ -116,7 +118,7 @@ export class Relay {
       message = await this.nacl.encode_utf8(JSON.stringify(message));
     }
 
-    return await this.nacl.rawEncodeMessage(message, Utils.fromBase64(relayPk), Utils.fromBase64(privateKey));
+    return await this.nacl.rawEncodeMessage(message, relayPk, Utils.fromBase64(privateKey));
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -128,8 +130,8 @@ export class Relay {
 
     const privateKey = this.sessionKeys.privateKey;
 
-    return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
-      Utils.fromBase64(relayPk), Utils.fromBase64(privateKey));
+    return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
+      Utils.fromBase64(privateKey));
   }
 
   // ---------- Low-level server request handling ----------
