@@ -10,11 +10,12 @@ import {
   DeleteFileResponse,
   MessageStatusResponse,
   FileUploadMetadata,
+  ZaxMessageKind,
   ZaxRawMessage,
   ZaxFileMessage,
   ZaxPlainMessage,
   ZaxTextMessage,
-  ParsedZaxMessage
+  ZaxParsedMessage
 } from '../zax.interface';
 import { RelaysService } from '../relay/relays.service';
 
@@ -119,7 +120,7 @@ export class Mailbox {
     const relay = await RelaysService.getRelay(url);
     const guestPk = this.keyRing.getGuestKey(guestKey);
     if (!guestPk) {
-      throw new Error(`[Mailbox] upload: Don't know guest ${guestKey}`);
+      throw new Error(`[Mailbox] upload: Unknown guest ${guestKey}`);
     }
 
     const payload = encrypt ? await this.encodeMessage(guestKey, message) : message;
@@ -135,12 +136,12 @@ export class Mailbox {
    * or if it can't be decrypted because HPK is missing in the keyring.
    * Returns an array of mixed messages
    */
-  async download(url: string): Promise<ParsedZaxMessage[]> {
+  async download(url: string): Promise<ZaxParsedMessage[]> {
     const relay = await RelaysService.getRelay(url);
     const response = await this.runRelayCommand(relay, 'download');
     const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
 
-    const parsedMessages: ParsedZaxMessage[] = [];
+    const parsedMessages: ZaxParsedMessage[] = [];
     for (const message of messages) {
       const senderTag = this.keyRing.getTagByHpk(message.from);
       if (!senderTag) {
@@ -161,7 +162,7 @@ export class Mailbox {
    * because sender's HPK is not found in the keyring
    */
   private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage): Promise<ZaxPlainMessage> {
-    return { data, time, from, nonce, kind: 'plain' };
+    return { data, time, from, nonce, kind: ZaxMessageKind.plain };
   }
 
   /**
@@ -170,7 +171,7 @@ export class Mailbox {
   private async parseFileMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxFileMessage> {
     const { nonce, ctext, uploadID } = JSON.parse(message.data);
     const data: FileUploadMetadata = await this.decodeMessage(senderTag, nonce, ctext);
-    return { data, time: message.time, senderTag, uploadID, nonce, kind: 'file' };
+    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file };
   }
 
   /**
@@ -182,7 +183,7 @@ export class Mailbox {
     if (!data) {
       data = message.data;
     }
-    return ({ data, time: message.time, senderTag, nonce: message.nonce, kind: 'message' });
+    return ({ data, time: message.time, senderTag, nonce: message.nonce, kind: ZaxMessageKind.message });
   }
 
   /**
@@ -229,7 +230,7 @@ export class Mailbox {
     const relay = await RelaysService.getRelay(url);
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`[Mailbox] startFileUpload: Don't know guest ${guest}`);
+      throw new Error(`[Mailbox] startFileUpload: Unknown guest ${guest}`);
     }
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
@@ -344,7 +345,7 @@ export class Mailbox {
   async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`[Mailbox] encodeMessage: Don't know guest ${guest}`);
+      throw new Error(`[Mailbox] encodeMessage: Unknown guest ${guest}`);
     }
 
     const privateKey = this.keyRing.commKey.privateKey;
@@ -365,7 +366,7 @@ export class Mailbox {
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
-      throw new Error(`[Mailbox] decodeMessage: Don't know guest ${guest}`);
+      throw new Error(`[Mailbox] decodeMessage: Unknown guest ${guest}`);
     }
 
     const privateKey = this.keyRing.commKey.privateKey;

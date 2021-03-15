@@ -11,17 +11,26 @@ export interface ConnectionData {
   relayPublicKey: Uint8Array;
 }
 
+// In the future versions, plugins could add their own commands to specific relays
+enum RelayCommand {
+  // Message commands
+  count = 'count',
+  upload = 'upload',
+  download = 'download',
+  messageStatus = 'messageStatus',
+  delete = 'delete',
+  // File commands
+  startFileUpload = 'startFileUpload',
+  uploadFileChunk = 'uploadFileChunk',
+  downloadFileChunk = 'downloadFileChunk',
+  fileStatus = 'fileStatus',
+  deleteFile = 'deleteFile'
+}
+
 /**
  * Low-level operations with Zax relay
  */
 export class Relay {
-  // Plugins can add their own commands to specific relays
-  static readonly relayCommands = [
-    // Message commands
-    'count', 'upload', 'download', 'messageStatus', 'delete',
-    // File commands
-    'startFileUpload', 'uploadFileChunk', 'downloadFileChunk', 'fileStatus', 'deleteFile'];
-
   private nacl: NaClDriver;
   private difficulty: number;
   private publicKey?: Uint8Array;
@@ -140,7 +149,7 @@ export class Relay {
    * Executes a message/file command on a relay, parses and validates the response
    */
   async runCmd(command: string, hpk: Base64, message: EncryptedMessage, ctext?: string): Promise<string[]> {
-    if (!Relay.relayCommands.includes(command)) {
+    if (!Object.keys(RelayCommand).includes(command)) {
       throw new Error(`[Relay] ${this.url} doesn't support command ${command}`);
     }
 

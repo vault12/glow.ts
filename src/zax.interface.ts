@@ -23,6 +23,12 @@ export enum MessageStatusResponse {
 
 // -------------- Message formats --------------
 
+export enum ZaxMessageKind {
+  message = 'message',
+  file = 'file',
+  plain = 'plain'
+}
+
 /**
  * Format of raw messages provided by `download` Zax command
  */
@@ -31,7 +37,7 @@ export interface ZaxRawMessage {
   time: number;
   from: Base64;
   nonce: Base64;
-  kind: 'message' | 'file';
+  kind: ZaxMessageKind.message | ZaxMessageKind.file;
 }
 
 export interface ZaxTextMessage {
@@ -43,7 +49,7 @@ export interface ZaxTextMessage {
   time: number;
   senderTag: string;
   nonce: Base64;
-  kind: 'message';
+  kind: ZaxMessageKind.message;
 }
 
 export interface ZaxFileMessage {
@@ -52,7 +58,7 @@ export interface ZaxFileMessage {
   senderTag: string;
   uploadID: string;
   nonce: Base64;
-  kind: 'file';
+  kind: ZaxMessageKind.file;
 }
 
 export interface ZaxPlainMessage {
@@ -60,10 +66,10 @@ export interface ZaxPlainMessage {
   time: number;
   from: Base64;
   nonce: Base64;
-  kind: 'plain';
+  kind: ZaxMessageKind.plain;
 }
 
-export type ParsedZaxMessage = ZaxPlainMessage | ZaxFileMessage | ZaxTextMessage;
+export type ZaxParsedMessage = ZaxPlainMessage | ZaxFileMessage | ZaxTextMessage;
 
 // -------------- File command responses --------------
 // See https://github.com/vault12/zax/wiki/Zax-2.0-File-Commands
