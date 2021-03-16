@@ -115,7 +115,6 @@ export class Mailbox {
    * send a plaintext message. Returns a token that can be used with `messageStatus` command to check
    * the status of the message
    */
-  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   async upload(url: string, guestKey: string, message: any, encrypt = true): Promise<Base64> {
     const relay = await RelaysService.getRelay(url);
     const guestPk = this.keyRing.getGuestKey(guestKey);
@@ -317,7 +316,6 @@ export class Mailbox {
   /**
    * Encrypts the payload of the command and sends it to a relay
    */
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.getHpk();
@@ -341,7 +339,6 @@ export class Mailbox {
    * added to the keyring. If the session flag is set, we will look for keys in
    * temporary, not the persistent collection of session keys
    */
-  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {
@@ -362,7 +359,6 @@ export class Mailbox {
    * nonce. If session flag is set, looks for keys in temporary, not the
    * persistent collection of session keys
    */
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
     const guestPk = this.keyRing.getGuestKey(guest);
     if (!guestPk) {

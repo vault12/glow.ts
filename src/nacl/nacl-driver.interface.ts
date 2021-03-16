@@ -27,7 +27,6 @@ export interface NaClDriver {
   // Encoding wrappers
   rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array, skFrom: Uint8Array,
     nonceData?: number): Promise<EncryptedMessage>;
-  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any>;
 
   // Helpers

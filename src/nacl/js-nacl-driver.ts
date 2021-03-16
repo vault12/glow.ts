@@ -155,7 +155,6 @@ export class JsNaClDriver implements NaClDriver {
   /**
    * Decodes a binary message with `cryptobox_open`
    */
-  /* eslint-disable @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any */
   async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
     const data = await this.crypto_box_open(ctext, nonce, pkFrom, skTo);
     if (data) {
