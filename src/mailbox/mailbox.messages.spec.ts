@@ -1,6 +1,7 @@
 import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { testRelayURL } from '../tests.helper';
+import { MessageStatusResponse } from '../zax.interface';
 
 describe('Mailbox / Messages', () => {
   let Alice: Mailbox;
@@ -56,7 +57,7 @@ describe('Mailbox / Messages', () => {
   it('check deleted message status', async () => {
     await Alice.connectToRelay(testRelayURL);
     const ttl = await Alice.messageStatus(testRelayURL, token);
-    expect(ttl).toBe(0); // the key is missing on the relay
+    expect(ttl).toBe(MessageStatusResponse.MissingKey); // the key is missing on the relay
   });
 
   it('send unencrypted message', async () => {

@@ -196,6 +196,7 @@ export class Relay {
     const response = rawResponse.split('\r\n');
 
     if (!rawResponse || !this.validateResponse(command, response.length)) {
+      console.log(response);
       throw new Error(`[Relay] ${this.url} - ${command}: Bad response`);
     }
 

@@ -117,11 +117,7 @@ export class Mailbox {
    */
   async upload(url: string, guestKey: string, message: any, encrypt = true): Promise<Base64> {
     const relay = await RelaysService.getRelay(url);
-    const guestPk = this.keyRing.getGuestKey(guestKey);
-    if (!guestPk) {
-      throw new Error(`[Mailbox] upload: Unknown guest ${guestKey}`);
-    }
-
+    const guestPk = this.getGuestKey(guestKey);
     const payload = encrypt ? await this.encodeMessage(guestKey, message) : message;
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
@@ -206,15 +202,13 @@ export class Mailbox {
 
   /**
   * Gets the status of a previously sent Zax message by a storage token.
-  * Returns "time to live" in seconds or 0 if the message is not found
+  * Returns "time to live" in seconds or a negative value if it's not applicable.
+  * See `MessageStatusResponse` values for reference
   */
-  async messageStatus(url: string, storageToken: Base64): Promise<number> {
+  async messageStatus(url: string, storageToken: Base64): Promise<MessageStatusResponse | number> {
     const relay = await RelaysService.getRelay(url);
     const [response] = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
     const status = parseInt(response, 10);
-    if (status === MessageStatusResponse.MissingKey || status === MessageStatusResponse.NeverExpires) {
-      return 0;
-    }
     return status;
   }
 
@@ -227,10 +221,7 @@ export class Mailbox {
   async startFileUpload(guest: string, url: string,
     rawMetadata: FileUploadMetadata): Promise<StartFileUploadResponse> {
     const relay = await RelaysService.getRelay(url);
-    const guestPk = this.keyRing.getGuestKey(guest);
-    if (!guestPk) {
-      throw new Error(`[Mailbox] startFileUpload: Unknown guest ${guest}`);
-    }
+    const guestPk = this.getGuestKey(guest);
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
@@ -340,11 +331,7 @@ export class Mailbox {
    * temporary, not the persistent collection of session keys
    */
   async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
-    const guestPk = this.keyRing.getGuestKey(guest);
-    if (!guestPk) {
-      throw new Error(`[Mailbox] encodeMessage: Unknown guest ${guest}`);
-    }
-
+    const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.commKey.privateKey;
 
     if (!(message instanceof Uint8Array)) {
@@ -360,11 +347,7 @@ export class Mailbox {
    * persistent collection of session keys
    */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
-    const guestPk = this.keyRing.getGuestKey(guest);
-    if (!guestPk) {
-      throw new Error(`[Mailbox] decodeMessage: Unknown guest ${guest}`);
-    }
-
+    const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.commKey.privateKey;
 
     return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
@@ -389,5 +372,16 @@ export class Mailbox {
   private async decodeMessageSymmetric(nonce: Base64, ctext: Base64,
     secretKey: Uint8Array): Promise<Uint8Array | null> {
     return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
+  }
+
+  /**
+   * Wrapper around `keyring.getGuestKey` that handles unknown guests
+   */
+  private getGuestKey(guest: string): string {
+    const guestPk = this.keyRing.getGuestKey(guest);
+    if (!guestPk) {
+      throw new Error(`[Mailbox] Unknown guest ${guest}`);
+    }
+    return guestPk;
   }
 }
