@@ -229,7 +229,7 @@ export class Relay {
     do {
       nonce = await this.nacl.random_bytes(32);
       h2 = await this.nacl.h2(new Uint8Array([...handshake, ...nonce]));
-    } while (!this.arrayZeroBits(h2, this.difficulty));
+    } while (!this.arrayZeroBits(h2));
 
     return nonce;
   }
@@ -243,10 +243,10 @@ export class Relay {
    * reduce burden on a busy server by ensuring clients have to do some
    * additional work during the session handshake
    */
-  private arrayZeroBits(array: Uint8Array, difficulty: number): boolean {
+  private arrayZeroBits(array: Uint8Array): boolean {
     let byte;
-    let n = difficulty;
-    for (let i = 0; i <= (1 + difficulty / 8); i++) {
+    let n = this.difficulty;
+    for (let i = 0; i <= (1 + this.difficulty / 8); i++) {
       byte = array[i];
       if (n <= 0) {
         return true;
