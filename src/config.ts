@@ -1,6 +1,4 @@
 export const config = {
-
-  COMM_KEY_TAG: '__::commKey::__',
   NONCE_TAG: '__nc',
   STORAGE_ROOT: '.v2.stor.vlt12',
   // Relay tokens, keys and hashes are 32 bytes

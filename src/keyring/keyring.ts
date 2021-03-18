@@ -4,7 +4,6 @@ import { LocalStorageDriver } from '../crypto-storage/local-storage.driver';
 import { Keys } from '../keys/keys';
 import { NaCl } from '../nacl/nacl';
 import { Utils, Base64 } from '../utils/utils';
-import { config } from '../config';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 
 interface KeyRecord {
@@ -20,7 +19,10 @@ interface TempKeyTimeout {
   startTime: number;
 }
 
+const commKeyTag = '__::commKey::__';
+
 interface KeyRingBackup {
+  [commKeyTag]: string;
   [key: string]: string | null | undefined
 }
 
@@ -29,8 +31,7 @@ export class KeyRing {
   static readonly commKeyTag = 'comm_key';
   static readonly guestRegistryTag = 'guest_registry';
 
-  public commKey: Keys;
-
+  private commKey: Keys;
   private storage: CryptoStorage;
   private guestKeys: Map<string, KeyRecord> = new Map();
   private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
@@ -53,14 +54,15 @@ export class KeyRing {
     return keyRing;
   }
 
-  static async fromBackup(id: string, backup: string, storageDriver?: StorageDriver): Promise<KeyRing> {
-    const backupObject = JSON.parse(backup);
-    const secretKey = Utils.fromBase64(backupObject[config.COMM_KEY_TAG]);
-    delete backupObject[config.COMM_KEY_TAG];
+  static async fromBackup(id: string, backupString: string, storageDriver?: StorageDriver): Promise<KeyRing> {
+    const backup: KeyRingBackup = JSON.parse(backupString);
+    const secretKey = Utils.fromBase64(backup[commKeyTag]);
     const restoredKeyRing = await KeyRing.new(id, storageDriver);
     await restoredKeyRing.setCommFromSecKey(secretKey);
-    for (const [key, value] of Object.entries(backupObject)) {
-      await restoredKeyRing.addGuest(key, value as string);
+    for (const [key, value] of Object.entries(backup)) {
+      if (key !== commKeyTag) {
+        await restoredKeyRing.addGuest(key, value as string);
+      }
     }
     return restoredKeyRing;
   }
@@ -71,6 +73,10 @@ export class KeyRing {
 
   getPubCommKey(): string {
     return this.commKey.publicKey;
+  }
+
+  getPrivateCommKey(): string {
+    return this.commKey.privateKey;
   }
 
   async getHpk(): Promise<Base64> {
@@ -98,17 +104,18 @@ export class KeyRing {
   // Backups
 
   async backup(): Promise<string> {
-    const backupObject: KeyRingBackup = {};
-    backupObject[config.COMM_KEY_TAG] = this.commKey.privateKey;
+    const backup: KeyRingBackup = {
+      [commKeyTag]: this.commKey.privateKey
+    };
 
     if (this.getNumberOfGuests() > 0) {
       for (const [key, value] of this.guestKeys) {
         if (key && value) {
-          backupObject[key] = value.pk;
+          backup[key] = value.pk;
         }
       }
     }
-    return JSON.stringify(backupObject);
+    return JSON.stringify(backup);
   }
 
   async setCommFromSeed(seed: Uint8Array): Promise<void> {

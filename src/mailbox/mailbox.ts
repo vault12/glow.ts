@@ -104,7 +104,7 @@ export class Mailbox {
   }
 
   private async encryptSignature(connectionData: ConnectionData) {
-    const privateKey = Utils.fromBase64(this.keyRing.commKey.privateKey);
+    const privateKey = Utils.fromBase64(this.keyRing.getPrivateCommKey());
     return await this.nacl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
   }
 
@@ -332,7 +332,7 @@ export class Mailbox {
    */
   async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
     const guestPk = this.getGuestKey(guest);
-    const privateKey = this.keyRing.commKey.privateKey;
+    const privateKey = this.keyRing.getPrivateCommKey();
 
     if (!(message instanceof Uint8Array)) {
       message = await this.nacl.encode_utf8(JSON.stringify(message));
@@ -348,7 +348,7 @@ export class Mailbox {
    */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
     const guestPk = this.getGuestKey(guest);
-    const privateKey = this.keyRing.commKey.privateKey;
+    const privateKey = this.keyRing.getPrivateCommKey();
 
     return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));

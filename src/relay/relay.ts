@@ -32,12 +32,11 @@ enum RelayCommand {
  */
 export class Relay {
   private nacl: NaClDriver;
-  private difficulty: number;
+  private difficulty = 0;
   private publicKey?: Uint8Array;
 
   private constructor(public url: string, private clientToken: Uint8Array, private sessionKeys: Keys) {
     this.nacl = NaCl.getInstance();
-    this.difficulty = 0;
   }
 
   static async new(url: string): Promise<Relay> {
@@ -54,7 +53,7 @@ export class Relay {
 
   /**
    * Exchanges tokens with a relay and gets a temp session key for this relay.
-   * Returns h₂(signature)
+   * Returns h₂(signature) and a relay public key
    */
   async openConnection(): Promise<ConnectionData> {
     const relayToken = await this.fetchRelayToken();
