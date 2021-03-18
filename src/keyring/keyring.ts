@@ -128,7 +128,7 @@ export class KeyRing {
     } else if (Array.isArray(guestKeys)) {
       this.guestKeys = new Map(guestKeys);
     } else {
-      throw new Error('"Guest keys" is not an array');
+      throw new Error('[Keyring] Guest keys is not an array');
     }
   }
 

@@ -29,10 +29,10 @@ export class CryptoStorage {
 
   async save(tag: string, data: unknown): Promise<boolean> {
     if (!this.driver) {
-      throw new Error('Storage driver is not set');
+      throw new Error('[CryptoStorage] Storage driver is not set');
     }
     if (!this.storageKey) {
-      throw new Error('Storage key is not set');
+      throw new Error('[CryptoStorage] Storage key is not set');
     }
     // Convert the data to JSON, then convert that string to a byte array
     const input = JSON.stringify(data);
@@ -48,10 +48,10 @@ export class CryptoStorage {
 
   async get(tag: string): Promise<unknown> {
     if (!this.driver) {
-      throw new Error('Storage driver is not set');
+      throw new Error('[CryptoStorage] Storage driver is not set');
     }
     if (!this.storageKey) {
-      throw new Error('Storage key is not set');
+      throw new Error('[CryptoStorage] Storage key is not set');
     }
     // Get cipher text and nonce from the storage
     const data = await this.driver.get(this.addPrefix(tag));
@@ -67,13 +67,13 @@ export class CryptoStorage {
       const decoded = await this.nacl.decode_utf8(source);
       return JSON.parse(decoded);
     } else {
-      throw new Error('crypto_secretbox_open: decryption error');
+      throw new Error('[CryptoStorage] crypto_secretbox_open: decryption error');
     }
   }
 
   async remove(tag: string): Promise<boolean> {
     if (!this.driver) {
-      throw new Error('Storage driver is not set');
+      throw new Error('[CryptoStorage] Storage driver is not set');
     }
     await this.driver.remove(this.addPrefix(tag));
     await this.driver.remove(this.addNonceTag(tag));
