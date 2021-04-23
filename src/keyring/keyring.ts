@@ -9,14 +9,6 @@ import { NaClDriver } from '../nacl/nacl-driver.interface';
 interface KeyRecord {
   pk: Base64;
   hpk: Base64;
-  temp: boolean;
-}
-
-interface TempKeyTimeout {
-  // setTimeout has different return values in Node and browser,
-  // so we extract it right from the environment
-  timeoutId: ReturnType<typeof setTimeout>;
-  startTime: number;
 }
 
 const commKeyTag = '__::commKey::__';
@@ -34,7 +26,6 @@ export class KeyRing {
   private commKey: Keys;
   private storage: CryptoStorage;
   private guestKeys: Map<string, KeyRecord> = new Map();
-  private guestKeyTimeouts: Map<string, TempKeyTimeout> = new Map();
   private nacl: NaClDriver;
 
   private constructor(naclDriver: NaClDriver, cryptoStorage: CryptoStorage, commKey: Keys) {
@@ -128,23 +119,14 @@ export class KeyRing {
     await this.storage.save(KeyRing.commKeyTag, this.commKey);
   }
 
-  private async loadGuestKeys() {
-    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
-    if (!guestKeys) {
-      return;
-    } else if (Array.isArray(guestKeys)) {
-      this.guestKeys = new Map(guestKeys);
-    } else {
-      throw new Error('[Keyring] Guest keys is not an array');
-    }
-  }
-
   async addGuest(guestTag: string, publicKey: Base64): Promise<string> {
-    return await this.processGuest(guestTag, publicKey);
-  }
-
-  async addTempGuest(guestTag: string, publicKey: Base64, ttl: number): Promise<string> {
-    return await this.processGuest(guestTag, publicKey, ttl);
+    const b64_h2 = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(publicKey)));
+    this.guestKeys.set(guestTag, {
+      pk: publicKey,
+      hpk: b64_h2
+    });
+    await this.saveGuests();
+    return b64_h2;
   }
 
   async removeGuest(guestTag: string): Promise<boolean> {
@@ -155,35 +137,15 @@ export class KeyRing {
     return true;
   }
 
-  private async processGuest(guestTag: string, publicKey: Base64, ttl?: number): Promise<string> {
-    const b64_h2 = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(publicKey)));
-    this.guestKeys.set(guestTag, {
-      pk: publicKey,
-      hpk: b64_h2,
-      temp: !!ttl
-    });
-    if (ttl) {
-      this.setKeyTimeout(guestTag, ttl);
-      await this.saveGuests();
+  private async loadGuestKeys() {
+    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
+    if (!guestKeys) {
+      return;
+    } else if (Array.isArray(guestKeys)) {
+      this.guestKeys = new Map(guestKeys);
+    } else {
+      throw new Error('[Keyring] Guest keys is not an array');
     }
-    return b64_h2;
-  }
-
-  private setKeyTimeout(guestTag: string, ttl: number) {
-    const existingTimeout = this.guestKeyTimeouts.get(guestTag);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout.timeoutId);
-    }
-
-    const newTimeoutId = setTimeout(() => {
-      this.guestKeys.delete(guestTag);
-      this.guestKeyTimeouts.delete(guestTag);
-    }, ttl);
-
-    this.guestKeyTimeouts.set(guestTag, {
-      timeoutId: newTimeoutId,
-      startTime: Date.now()
-    });
   }
 
   private async saveGuests() {

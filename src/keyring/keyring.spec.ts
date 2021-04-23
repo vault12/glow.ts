@@ -64,20 +64,4 @@ describe('Keyring', () => {
 
     expect(backup).toBe(backedUpAgain);
   });
-
-  it('temporary keys', async () => {
-    jest.useFakeTimers();
-    const ring = await KeyRing.new('test5');
-    const keys = new Keys(await nacl.crypto_box_keypair());
-    await ring.addTempGuest('temp', keys.publicKey, 100);
-    // the key has to exist before we run the timer
-    expect(ring.getGuestKey('temp')).not.toBeNull();
-
-    jest.runAllTimers();
-
-    expect(setTimeout).toHaveBeenCalledTimes(1);
-    expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), 100);
-    // the key and timeout are erased
-    expect(ring.getNumberOfGuests()).toBe(0);
-  });
 });
