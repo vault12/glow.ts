@@ -184,8 +184,13 @@ export class Relay {
       timeout: config.RELAY_AJAX_TIMEOUT
     };
 
-    const response = await axios(requestPayload);
-    return String(response.data);
+    try {
+      const response = await axios(requestPayload);
+      return String(response.data);
+    } catch (e) {
+      console.log(e.response);
+      throw new Error('[Relay] Bad Response');
+    }
   }
 
   /**
