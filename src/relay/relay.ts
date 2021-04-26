@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig } from 'axios';
+import { Mutex } from 'async-mutex';
 
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
@@ -13,13 +14,13 @@ export interface ConnectionData {
 
 // In the future versions, plugins could add their own commands to specific relays
 enum RelayCommand {
-  // Message commands
+  // Zax message commands
   count = 'count',
   upload = 'upload',
   download = 'download',
   messageStatus = 'messageStatus',
   delete = 'delete',
-  // File commands
+  // Zax file commands
   startFileUpload = 'startFileUpload',
   uploadFileChunk = 'uploadFileChunk',
   downloadFileChunk = 'downloadFileChunk',
@@ -35,11 +36,17 @@ export class Relay {
   private difficulty = 0;
   private publicKey?: Uint8Array;
 
+  // Static global dictionary of relays to refer to, because the apps using this library
+  // only need a single instance of a Relay class per given URL.
+  private static relays: { [url: string]: Relay } = {};
+  // Ensures that a call to the static getInstance() method is blocking
+  private static instanceMutex = new Mutex();
+
   private constructor(public url: string, private clientToken: Uint8Array, private sessionKeys: Keys) {
     this.nacl = NaCl.getInstance();
   }
 
-  static async new(url: string): Promise<Relay> {
+  private static async new(url: string): Promise<Relay> {
     const nacl = NaCl.getInstance();
     // Generate a client token. It will be used as part of handshake id with relay
     const clientToken = await nacl.random_bytes(config.RELAY_TOKEN_LEN);
@@ -47,6 +54,21 @@ export class Relay {
     // Each session with each Zax relay creates its own temporary session keys
     const sessionKeys = new Keys(await nacl.crypto_box_keypair());
     return new Relay(url, clientToken, sessionKeys);
+  }
+
+  /**
+   * Relay factory, that returns a Relay instance for a given URL,
+   * or creates a new one if it hasn't yet been initialized.
+   * The usage of `async-mutex` guarantees that only one instance per given URL will ever exist.
+   */
+  static async getInstance(url: string): Promise<Relay> {
+    return await this.instanceMutex.runExclusive(async () => {
+      let relay = this.relays[url];
+      if (!relay) {
+        relay = this.relays[url] = await Relay.new(url);
+      }
+      return relay;
+    });
   }
 
   // ---------- Connection initialization ----------
