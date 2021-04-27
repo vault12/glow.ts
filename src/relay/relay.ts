@@ -35,6 +35,7 @@ export class Relay {
   private nacl: NaClDriver;
   private difficulty = 0;
   private publicKey?: Uint8Array;
+  private tokenExpired = false;
 
   // Static global dictionary of relays to refer to, because the apps using this library
   // only need a single instance of a Relay class per given URL.
@@ -71,6 +72,10 @@ export class Relay {
     });
   }
 
+  get isTokenExpired() {
+    return this.tokenExpired;
+  }
+
   // ---------- Connection initialization ----------
 
   /**
@@ -78,6 +83,8 @@ export class Relay {
    * Returns h₂(signature) and a relay public key
    */
   async openConnection(): Promise<ConnectionData> {
+    // reset token expiration flag, since we are reconnecting again
+    this.tokenExpired = false;
     const relayToken = await this.fetchRelayToken();
     const relayPublicKey = await this.fetchRelayPublicKey(relayToken);
     return {
@@ -91,7 +98,8 @@ export class Relay {
    */
   private async fetchRelayToken(): Promise<Uint8Array> {
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
-
+    // Set a timer to mark a relay instance as having an expired token after a ceftain time
+    this.scheduleExpiration();
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
     const [token, difficulty] = this.parseResponse('start_session', data);
 
@@ -243,6 +251,15 @@ export class Relay {
       default:
         return lines === 2;
     }
+  }
+
+  /**
+   * Mark a relay instance as having an expired token, so reconnection is required
+   */
+  private scheduleExpiration() {
+    setTimeout(() => {
+      this.tokenExpired = true;
+    }, config.RELAY_TOKEN_TIMEOUT);
   }
 
   // ---------- Difficulty adjustment ----------

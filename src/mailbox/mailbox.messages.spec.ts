@@ -2,6 +2,8 @@ import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { testRelayURL } from '../tests.helper';
 import { MessageStatusResponse } from '../zax.interface';
+import { config } from '../config';
+import { Relay } from '../relay/relay';
 
 describe('Mailbox / Messages', () => {
   let Alice: Mailbox;
@@ -17,11 +19,10 @@ describe('Mailbox / Messages', () => {
 
     await Alice.keyRing.addGuest('Bob', Bob.getPubCommKey());
     await Bob.keyRing.addGuest('Alice', Alice.getPubCommKey());
-
-    await Alice.connectToRelay(testRelayURL);
   });
 
   it('send a message', async () => {
+    await Alice.connectToRelay(testRelayURL);
     const wrongRecipient = Alice.upload(testRelayURL, 'Carl', 'some message');
     expect(wrongRecipient).rejects.toThrow(Error);
 
@@ -69,4 +70,26 @@ describe('Mailbox / Messages', () => {
     const [ message ] = await Bob.download(testRelayURL);
     expect(message.data).toBe('some unencrypted message');
   });
+
+  it('should reconnect after token expiration timeout', async () => {
+    jest.useFakeTimers();
+    await Bob.connectToRelay(testRelayURL);
+    const relay = await Relay.getInstance(testRelayURL);
+    const connectSpy = jest.spyOn(Bob, 'connectToRelay');
+
+    // fast-forward to where the token is not yet expired
+    jest.advanceTimersByTime(config.RELAY_TOKEN_TIMEOUT - 1);
+    expect(relay.isTokenExpired).toBe(false);
+    await Bob.download(testRelayURL);
+    expect(connectSpy).not.toHaveBeenCalled();
+
+    // has to reconnect under the hood when a token expires
+    jest.advanceTimersByTime(2);
+    expect(relay.isTokenExpired).toBe(true);
+    await Bob.download(testRelayURL);
+    expect(connectSpy).toHaveBeenCalledTimes(1);
+
+    jest.clearAllTimers();
+  });
+
 });
