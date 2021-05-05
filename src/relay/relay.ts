@@ -151,10 +151,6 @@ export class Relay {
 
     const privateKey = this.sessionKeys.privateKey;
 
-    if (!(message instanceof Uint8Array)) {
-      message = await this.nacl.encode_utf8(JSON.stringify(message));
-    }
-
     return await this.nacl.rawEncodeMessage(message, relayPk, Utils.fromBase64(privateKey));
   }
 

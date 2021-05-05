@@ -343,10 +343,6 @@ export class Mailbox {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    if (!(message instanceof Uint8Array)) {
-      message = await this.nacl.encode_utf8(JSON.stringify(message));
-    }
-
     return await this.nacl.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 

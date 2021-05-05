@@ -25,8 +25,7 @@ export interface NaClDriver {
   crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array>;
 
   // Encoding wrappers
-  rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array, skFrom: Uint8Array,
-    nonceData?: number): Promise<EncryptedMessage>;
+  rawEncodeMessage(message: any, pkTo: Uint8Array, skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage>;
   rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any>;
 
   // Helpers

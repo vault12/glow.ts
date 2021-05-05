@@ -143,8 +143,13 @@ export class JsNaClDriver implements NaClDriver {
   /**
    * Encodes a binary message with `cryptobox`
    */
-  async rawEncodeMessage(message: Uint8Array, pkTo: Uint8Array,
+  async rawEncodeMessage(message: any, pkTo: Uint8Array,
     skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
+
+    if (!(message instanceof Uint8Array)) {
+      message = await this.encode_utf8(JSON.stringify(message));
+    }
+
     const nonce = await this.makeNonce(nonceData);
     const ctext = await this.crypto_box(message, nonce, pkTo, skFrom);
     return {
