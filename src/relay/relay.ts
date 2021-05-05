@@ -13,7 +13,7 @@ export interface ConnectionData {
 }
 
 // In the future versions, plugins could add their own commands to specific relays
-enum RelayCommand {
+export enum RelayCommand {
   // Zax message commands
   count = 'count',
   upload = 'upload',
@@ -98,7 +98,7 @@ export class Relay {
    */
   private async fetchRelayToken(): Promise<Uint8Array> {
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
-    // Set a timer to mark a relay instance as having an expired token after a ceftain time
+    // Set a timer to mark a relay instance as having an expired token after a certain time
     this.scheduleExpiration();
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
     const [token, difficulty] = this.parseResponse('start_session', data);
@@ -175,7 +175,7 @@ export class Relay {
   /**
    * Executes a message/file command on a relay, parses and validates the response
    */
-  async runCmd(command: string, hpk: Base64, message: EncryptedMessage, ctext?: string): Promise<string[]> {
+  async runCmd(command: RelayCommand, hpk: Base64, message: EncryptedMessage, ctext?: string): Promise<string[]> {
     if (!Object.keys(RelayCommand).includes(command)) {
       throw new Error(`[Relay] ${this.url} doesn't support command ${command}`);
     }
@@ -242,11 +242,11 @@ export class Relay {
    */
   private validateResponse(command: string, lines: number): boolean {
     switch (command) {
-      case 'upload':
-      case 'messageStatus':
-      case 'delete':
+      case RelayCommand.upload:
+      case RelayCommand.messageStatus:
+      case RelayCommand.delete:
         return lines === 1;
-      case 'downloadFileChunk':
+      case RelayCommand.downloadFileChunk:
         return lines === 3;
       default:
         return lines === 2;

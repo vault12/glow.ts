@@ -131,9 +131,10 @@ export class JsNaClDriver implements NaClDriver {
       data = await this.encode_latin1(data);
     }
 
-    const extendedSource = new Uint8Array(64 + data.length);
+    const zeroPaddingLength = 64;
+    const extendedSource = new Uint8Array(zeroPaddingLength + data.length);
     extendedSource.fill(0);
-    extendedSource.set(data, 64);
+    extendedSource.set(data, zeroPaddingLength);
     return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
   }
 

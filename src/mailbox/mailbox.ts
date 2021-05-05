@@ -2,7 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
-import { Relay, ConnectionData } from '../relay/relay';
+import { Relay, RelayCommand, ConnectionData } from '../relay/relay';
 import {
   StartFileUploadResponse,
   UploadFileChunkResponse,
@@ -120,7 +120,7 @@ export class Mailbox {
     const payload = encrypt ? await this.encodeMessage(guestKey, message) : message;
     const toHpk = Utils.toBase64(await this.nacl.h2(Utils.fromBase64(guestPk)));
 
-    const [token] = await this.runRelayCommand(relay, 'upload', { to: toHpk, payload });
+    const [token] = await this.runRelayCommand(relay, RelayCommand.upload, { to: toHpk, payload });
     return token;
   }
 
@@ -132,7 +132,7 @@ export class Mailbox {
    */
   async download(url: string): Promise<ZaxParsedMessage[]> {
     const relay = await this.initializeRelay(url);
-    const response = await this.runRelayCommand(relay, 'download');
+    const response = await this.runRelayCommand(relay, RelayCommand.download);
     const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
 
     const parsedMessages: ZaxParsedMessage[] = [];
@@ -185,7 +185,7 @@ export class Mailbox {
    */
   async count(url: string): Promise<number> {
     const relay = await this.initializeRelay(url);
-    const response = await this.runRelayCommand(relay, 'count');
+    const response = await this.runRelayCommand(relay, RelayCommand.count);
     return await this.decryptResponse(relay, response);
   }
 
@@ -195,7 +195,7 @@ export class Mailbox {
   */
   async delete(url: string, nonceList: Base64[]): Promise<number> {
     const relay = await this.initializeRelay(url);
-    const [response] = await this.runRelayCommand(relay, 'delete', { payload: nonceList });
+    const [response] = await this.runRelayCommand(relay, RelayCommand.delete, { payload: nonceList });
     return parseInt(response, 10);
   }
 
@@ -206,7 +206,7 @@ export class Mailbox {
   */
   async messageStatus(url: string, storageToken: Base64): Promise<MessageStatusResponse | number> {
     const relay = await this.initializeRelay(url);
-    const [response] = await this.runRelayCommand(relay, 'messageStatus', { token: storageToken });
+    const [response] = await this.runRelayCommand(relay, RelayCommand.messageStatus, { token: storageToken });
     const status = parseInt(response, 10);
     return status;
   }
@@ -228,7 +228,7 @@ export class Mailbox {
 
     const metadata = await this.encodeMessage(guest, rawMetadata);
 
-    const response = await this.runRelayCommand(relay, 'startFileUpload', {
+    const response = await this.runRelayCommand(relay, RelayCommand.startFileUpload, {
       to: toHpk,
       file_size: rawMetadata.orig_size,
       metadata
@@ -247,7 +247,7 @@ export class Mailbox {
     part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
     const relay = await this.initializeRelay(url);
     const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
-    const response = await this.runRelayCommand(relay, 'uploadFileChunk', {
+    const response = await this.runRelayCommand(relay, RelayCommand.uploadFileChunk, {
       uploadID,
       part,
       last_chunk: (totalParts - 1 === part), // marker of the last chunk, sent only once
@@ -263,7 +263,7 @@ export class Mailbox {
    */
   async getFileStatus(url: string, uploadID: string): Promise<FileStatusResponse> {
     const relay = await this.initializeRelay(url);
-    const response = await this.runRelayCommand(relay, 'fileStatus', { uploadID });
+    const response = await this.runRelayCommand(relay, RelayCommand.fileStatus, { uploadID });
     return await this.decryptResponse(relay, response);
   }
 
@@ -285,7 +285,7 @@ export class Mailbox {
    */
   async downloadFileChunk(url: string, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
     const relay = await this.initializeRelay(url);
-    const response = await this.runRelayCommand(relay, 'downloadFileChunk', { uploadID, part });
+    const response = await this.runRelayCommand(relay, RelayCommand.downloadFileChunk, { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
     const decoded = await relay.decodeMessage(nonce, ctext);
     return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
@@ -297,7 +297,7 @@ export class Mailbox {
    */
   async deleteFile(url: string, uploadID: string): Promise<DeleteFileResponse> {
     const relay = await this.initializeRelay(url);
-    const response = await this.runRelayCommand(relay, 'deleteFile', { uploadID });
+    const response = await this.runRelayCommand(relay, RelayCommand.deleteFile, { uploadID });
     return await this.decryptResponse(relay, response);
   }
 
@@ -317,7 +317,7 @@ export class Mailbox {
   /**
    * Encrypts the payload of the command and sends it to a relay
    */
-  private async runRelayCommand(relay: Relay, command: string, params?: any, ctext?: string): Promise<string[]> {
+  private async runRelayCommand(relay: Relay, command: RelayCommand, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.getHpk();
     const message = await relay.encodeMessage(params);
@@ -337,8 +337,7 @@ export class Mailbox {
 
   /**
    * Encodes a free-form object `message` to the guest key of a guest already
-   * added to the keyring. If the session flag is set, we will look for keys in
-   * temporary, not the persistent collection of session keys
+   * added to the keyring
    */
   async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
     const guestPk = this.getGuestKey(guest);
@@ -352,9 +351,7 @@ export class Mailbox {
   }
 
   /**
-   * Decodes a ciphertext from a guest key already in our keyring with this
-   * nonce. If session flag is set, looks for keys in temporary, not the
-   * persistent collection of session keys
+   * Decodes a ciphertext from a guest key already in our keyring with this nonce
    */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
     const guestPk = this.getGuestKey(guest);
