@@ -7,6 +7,7 @@ import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 import { RelayCommand } from '../zax.interface';
+
 export interface ConnectionData {
   h2Signature: Uint8Array;
   relayPublicKey: Uint8Array;
@@ -198,8 +199,9 @@ export class Relay {
       const response = await axios(requestPayload);
       return String(response.data);
     } catch (e) {
-      console.log(e.response);
-      throw new Error('[Relay] Bad Response');
+      // Throw just a status from Axios response schema, to handle it according to the HTTP status code
+      // https://github.com/axios/axios#response-schema
+      throw new Error(e.response.status);
     }
   }
 

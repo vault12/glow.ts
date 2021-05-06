@@ -26,8 +26,6 @@ describe('Relay', () => {
   });
 
   it('should handle server errors', async () => {
-    // Testing mode: suppress console log for a server error
-    jest.spyOn(console, 'log').mockImplementation();
     // This sets the mock adapter on the default Axios instance
     const mock = new MockAdapter(axios);
     // Always return 500 Internal Server Error
@@ -35,7 +33,7 @@ describe('Relay', () => {
 
     const relay = await Relay.getInstance(testRelayURL);
     const connection = relay.openConnection();
-    expect(connection).rejects.toThrow(Error);
+    expect(connection).rejects.toThrow('500');
 
     // Stop mocking Axios
     mock.restore();
