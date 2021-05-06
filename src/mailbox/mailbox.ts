@@ -105,7 +105,7 @@ export class Mailbox {
 
   private async encryptSignature(connectionData: ConnectionData) {
     const privateKey = Utils.fromBase64(this.keyRing.getPrivateCommKey());
-    return await this.nacl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
+    return await NaCl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
   }
 
   // ---------- Relay message commands (public API) ----------
@@ -344,7 +344,7 @@ export class Mailbox {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    return await this.nacl.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    return await NaCl.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   /**
@@ -354,7 +354,7 @@ export class Mailbox {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+    return await NaCl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
@@ -362,7 +362,7 @@ export class Mailbox {
    * Encodes a binary message with `secretbox` (used for file chunk encryption)
    */
   private async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array): Promise<EncryptedMessage> {
-    const nonce = await this.nacl.makeNonce();
+    const nonce = await NaCl.makeNonce();
     const ctext = await this.nacl.crypto_secretbox(message, nonce, secretKey);
     return {
       nonce: Utils.toBase64(nonce),

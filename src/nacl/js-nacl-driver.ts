@@ -1,8 +1,7 @@
 import { box, BoxKeyPair, randomBytes, secretbox, hash } from 'tweetnacl';
 import { sha256 } from 'js-sha256';
 
-import { Utils } from '../utils/utils';
-import { NaClDriver, EncryptedMessage } from './nacl-driver.interface';
+import { NaClDriver } from './nacl-driver.interface';
 import { Keypair } from './keypair.interface';
 
 
@@ -136,87 +135,5 @@ export class JsNaClDriver implements NaClDriver {
     extendedSource.fill(0);
     extendedSource.set(data, zeroPaddingLength);
     return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
-  }
-
-  // ---------- Encoding wrappers ----------
-
-  /**
-   * Encodes a binary message with `cryptobox`
-   */
-  async rawEncodeMessage(message: any, pkTo: Uint8Array,
-    skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage> {
-
-    if (!(message instanceof Uint8Array)) {
-      message = await this.encode_utf8(JSON.stringify(message));
-    }
-
-    const nonce = await this.makeNonce(nonceData);
-    const ctext = await this.crypto_box(message, nonce, pkTo, skFrom);
-    return {
-      nonce: Utils.toBase64(nonce),
-      ctext: Utils.toBase64(ctext)
-    };
-  }
-
-  /**
-   * Decodes a binary message with `cryptobox_open`
-   */
-  async rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
-    const data = await this.crypto_box_open(ctext, nonce, pkFrom, skTo);
-    if (data) {
-      const utf8 = await this.decode_utf8(data);
-      return JSON.parse(utf8);
-    }
-
-    return data;
-  }
-
-  // ---------- Nonce helper ----------
-
-  /**
-   * Makes a timestamp nonce that a relay expects for any crypto operations.
-   * Timestamp is the first 8 bytes, the rest is random, unless custom `data`
-   * is specified. `data` will be packed as next 4 bytes after timestamp.
-   */
-  async makeNonce(data?: number): Promise<Uint8Array> {
-    const nonce = await this.crypto_box_random_nonce();
-    let headerLen;
-    if (nonce.length !== this.crypto_box_NONCEBYTES) {
-      throw new Error('[Mailbox] Wrong crypto_box nonce length');
-    }
-    // split timestamp integer as an array of bytes
-    headerLen = 8; // max timestamp size
-    const aTime = this.itoa(Math.floor(Date.now() / 1000));
-
-    if (data) {
-      headerLen += 4; // extra 4 bytes for custom data
-    }
-
-    // zero out nonce header area
-    nonce.fill(0, 0, headerLen);
-    // copy the timestamp into the first 8 bytes of nonce
-    nonce.set(aTime, 8 - aTime.length);
-    // copy data if present
-    if (data) {
-      const aData = this.itoa(data);
-      nonce.set(aData, 12 - aData.length);
-    }
-    return nonce;
-  }
-
-  /**
-   * Splits an integer into an array of bytes
-   */
-  private itoa(num: number): Uint8Array {
-    // calculate length first
-    let hex = num.toString(16);
-    hex = hex.length & 1 ? `0${hex}` : hex;
-    const len = hex.length / 2;
-    const byteArray = new Uint8Array(len);
-
-    for (let j = 0, i = 0; i < hex.length; i += 2, j++) {
-      byteArray[j] = parseInt(hex[i] + hex[i + 1], 16);
-    }
-    return byteArray;
   }
 }

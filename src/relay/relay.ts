@@ -135,7 +135,7 @@ export class Relay {
 
     const privateKey = this.sessionKeys.privateKey;
 
-    return await this.nacl.rawEncodeMessage(message, relayPk, Utils.fromBase64(privateKey));
+    return await NaCl.rawEncodeMessage(message, relayPk, Utils.fromBase64(privateKey));
   }
 
   async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
@@ -146,7 +146,7 @@ export class Relay {
 
     const privateKey = this.sessionKeys.privateKey;
 
-    return await this.nacl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
+    return await NaCl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
       Utils.fromBase64(privateKey));
   }
 

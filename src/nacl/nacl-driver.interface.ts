@@ -23,10 +23,7 @@ export interface NaClDriver {
 
   // Hashing
   crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array>;
-
-  // Encoding wrappers
-  rawEncodeMessage(message: any, pkTo: Uint8Array, skFrom: Uint8Array, nonceData?: number): Promise<EncryptedMessage>;
-  rawDecodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any>;
+  h2(data: string | Uint8Array): Promise<Uint8Array>;
 
   // Helpers
   random_bytes(size: number): Promise<Uint8Array>;
@@ -36,7 +33,4 @@ export interface NaClDriver {
   decode_utf8(data: Uint8Array): Promise<string>;
   to_hex(data: Uint8Array): Promise<string>;
   from_hex(data: string): Promise<Uint8Array>;
-
-  h2(data: string | Uint8Array): Promise<Uint8Array>;
-  makeNonce(data?: number): Promise<Uint8Array>;
 }
