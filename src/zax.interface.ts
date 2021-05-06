@@ -8,6 +8,21 @@ import { Base64 } from './utils/utils';
  * https://s3-us-west-1.amazonaws.com/vault12/crypto_relay.pdf
  */
 
+// In the future versions, plugins could add their own commands to specific relays
+export enum RelayCommand {
+  // Zax message commands
+  count = 'count',
+  upload = 'upload',
+  download = 'download',
+  messageStatus = 'messageStatus',
+  delete = 'delete',
+  // Zax file commands
+  startFileUpload = 'startFileUpload',
+  uploadFileChunk = 'uploadFileChunk',
+  downloadFileChunk = 'downloadFileChunk',
+  fileStatus = 'fileStatus',
+  deleteFile = 'deleteFile'
+}
 
 /**
  * Status of a previously sent message equals redis TTL.

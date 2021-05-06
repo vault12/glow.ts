@@ -2,8 +2,9 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
-import { Relay, RelayCommand, ConnectionData } from '../relay/relay';
+import { Relay, ConnectionData } from '../relay/relay';
 import {
+  RelayCommand,
   StartFileUploadResponse,
   UploadFileChunkResponse,
   FileStatusResponse,

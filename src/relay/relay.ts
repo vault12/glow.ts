@@ -6,26 +6,10 @@ import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
-
+import { RelayCommand } from '../zax.interface';
 export interface ConnectionData {
   h2Signature: Uint8Array;
   relayPublicKey: Uint8Array;
-}
-
-// In the future versions, plugins could add their own commands to specific relays
-export enum RelayCommand {
-  // Zax message commands
-  count = 'count',
-  upload = 'upload',
-  download = 'download',
-  messageStatus = 'messageStatus',
-  delete = 'delete',
-  // Zax file commands
-  startFileUpload = 'startFileUpload',
-  uploadFileChunk = 'uploadFileChunk',
-  downloadFileChunk = 'downloadFileChunk',
-  fileStatus = 'fileStatus',
-  deleteFile = 'deleteFile'
 }
 
 /**
