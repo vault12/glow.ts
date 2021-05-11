@@ -195,14 +195,10 @@ export class Relay {
       timeout: config.RELAY_AJAX_TIMEOUT
     };
 
-    try {
-      const response = await axios(requestPayload);
-      return String(response.data);
-    } catch (e) {
-      // Throw just a status from Axios response schema, to handle it according to the HTTP status code
-      // https://github.com/axios/axios#response-schema
-      throw new Error(e.response.status);
-    }
+    // NOTE: Network and server errors are not handled ny Glow itself.
+    // They should instead be handled where the library is used
+    const response = await axios(requestPayload);
+    return String(response.data);
   }
 
   /**
