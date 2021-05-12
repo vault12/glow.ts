@@ -8,7 +8,7 @@ import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 import { RelayCommand } from '../zax.interface';
 
-export interface ConnectionData {
+export interface RelayConnectionData {
   h2Signature: Uint8Array;
   relayPublicKey: Uint8Array;
 }
@@ -67,7 +67,7 @@ export class Relay {
    * Exchanges tokens with a relay and gets a temp session key for this relay.
    * Returns h₂(signature) and a relay public key
    */
-  async openConnection(): Promise<ConnectionData> {
+  async openConnection(): Promise<RelayConnectionData> {
     // reset token expiration flag, since we are reconnecting again
     this.tokenExpired = false;
     const relayToken = await this.fetchRelayToken();

@@ -47,7 +47,7 @@ describe('Mailbox / File transfer', () => {
       created: randomNumber(1480000000, 1520000000),
       modified: randomNumber(1480000000, 1520000000)
     };
-    const response = await Alice.startFileUpload('Bob', testRelayURL, metadata);
+    const response = await Alice.startFileUpload(testRelayURL, 'Bob', metadata);
 
     expect(response).toHaveProperty('uploadID');
     expect(response).toHaveProperty('max_chunk_size');
