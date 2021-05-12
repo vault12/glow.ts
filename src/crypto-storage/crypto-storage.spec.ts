@@ -1,15 +1,12 @@
 import { CryptoStorage } from './crypto-storage';
 import { LocalStorageDriver } from './local-storage.driver';
 import { NaCl } from '../nacl/nacl';
-import { NaClDriver } from '../nacl/nacl-driver.interface';
 
 describe('CryptoStorage', () => {
-  let nacl: NaClDriver;
   let storage: CryptoStorage;
 
   beforeAll(async () => {
     NaCl.setInstance();
-    nacl = NaCl.getInstance();
     storage = await CryptoStorage.new(new LocalStorageDriver(), 'test');
   });
 

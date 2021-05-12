@@ -4,6 +4,7 @@ import { sha256 } from 'js-sha256';
 import { NaClDriver } from './nacl-driver.interface';
 import { Keypair } from './keypair.interface';
 
+
 /**
  * Implementation based on TweetNaCl.js: {@link https://github.com/dchest/tweetnacl-js}.
  * SHA256 is taken separately from `js-sha256` library, because TweetNacl only offers
@@ -27,6 +28,8 @@ export class JsNaClDriver implements NaClDriver {
   async crypto_secretbox_open(box: Uint8Array, nonce: Uint8Array, key: Uint8Array): Promise<Uint8Array | null> {
     return secretbox.open(box, nonce, key);
   }
+
+  crypto_box_NONCEBYTES = box.nonceLength;
 
   async crypto_box(message: Uint8Array, nonce: Uint8Array, pk: Uint8Array, sk: Uint8Array): Promise<Uint8Array> {
     return box(message, nonce, pk, sk);
@@ -122,11 +125,15 @@ export class JsNaClDriver implements NaClDriver {
    * Zero out initial sha256 block, and double hash 0-padded message
    * http://cs.nyu.edu/~dodis/ps/h-of-h.pdf
    */
-  async h2(data: string): Promise<Uint8Array> {
-    const source = await this.encode_latin1(data);
-    const extendedSource = new Uint8Array(64 + source.length);
+  async h2(data: string | Uint8Array): Promise<Uint8Array> {
+    if (!(data instanceof Uint8Array)) {
+      data = await this.encode_latin1(data);
+    }
+
+    const zeroPaddingLength = 64;
+    const extendedSource = new Uint8Array(zeroPaddingLength + data.length);
     extendedSource.fill(0);
-    extendedSource.set(source, 64);
+    extendedSource.set(data, zeroPaddingLength);
     return this.crypto_hash_sha256(await this.crypto_hash_sha256(extendedSource));
   }
 }
