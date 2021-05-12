@@ -12,6 +12,8 @@ import { Utils } from '../utils/utils';
 export class NaCl {
   private static driverInstance?: NaClDriver;
 
+  private constructor() {}
+
   public static setInstance(driver?: NaClDriver): boolean {
     if (this.driverInstance) {
       throw new Error('[NaCl] NaCl driver has been already set, it is supposed to be set only once');
