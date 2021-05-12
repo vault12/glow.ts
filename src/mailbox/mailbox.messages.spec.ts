@@ -17,8 +17,8 @@ describe('Mailbox / Messages', () => {
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
 
-    await Alice.keyRing.addGuest('Bob', Bob.getPubCommKey());
-    await Bob.keyRing.addGuest('Alice', Alice.getPubCommKey());
+    await Alice.keyRing.addGuest('Bob', Bob.keyRing.getPubCommKey());
+    await Bob.keyRing.addGuest('Alice', Alice.keyRing.getPubCommKey());
   });
 
   it('send a message', async () => {

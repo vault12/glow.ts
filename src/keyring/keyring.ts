@@ -62,6 +62,11 @@ export class KeyRing {
     return this.guestKeys.size;
   }
 
+  /**
+   * Returns public identity, which is the default communication key.
+   * Correspondents can know it, whereas Relays do not need it (other than
+   * temporarily for internal use during the ownership proof)
+   */
   getPubCommKey(): string {
     return this.commKey.publicKey;
   }
@@ -70,6 +75,10 @@ export class KeyRing {
     return this.commKey.privateKey;
   }
 
+  /**
+   * Returns HPK (hash of the public key) of the mailbox. This is what Zax relays
+   * uses as the universal address of the mailbox
+   */
   async getHpk(): Promise<Base64> {
     const hpk = await this.nacl.h2(Utils.fromBase64(this.commKey.publicKey));
     return Utils.toBase64(hpk);

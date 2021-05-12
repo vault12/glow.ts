@@ -66,48 +66,6 @@ export class Mailbox {
     return new Mailbox(NaCl.getInstance(), await KeyRing.fromBackup(identity, backup), identity);
   }
 
-  // ---------- Mailbox keys ----------
-
-  /**
-   * Returns HPK (hash of the public key) of the mailbox. This is what Zax relays
-   * uses as the universal address of the mailbox
-   */
-  async getHpk(): Promise<Base64> {
-    return await this.keyRing.getHpk();
-  }
-
-  /**
-   * Returns public identity, which is the default communication key.
-   * Correspondents can know it, whereas Relays do not need it (other than
-   * temporarily for internal use during the ownership proof)
-   */
-  getPubCommKey(): string {
-    return this.keyRing.getPubCommKey();
-  }
-
-  /**
-   * Establishes a session, exchanges temp keys and proves our ownership of this
-   * Mailbox to this specific relay. This is the first function to start
-   * communications with any relay. Returns the number of messages in the mailbox
-   */
-  async connectToRelay(url: string): Promise<number> {
-    const relay = await Relay.getInstance(url);
-    const connectionData = await relay.openConnection();
-    const encryptedSignature = await this.encryptSignature(connectionData);
-
-    const messagesNumber = await relay.prove(await relay.encodeMessage({
-      pub_key: this.keyRing.getPubCommKey(),
-      nonce: encryptedSignature.nonce,
-      ctext: encryptedSignature.ctext
-    }));
-    return parseInt(messagesNumber, 10);
-  }
-
-  private async encryptSignature(connectionData: RelayConnectionData) {
-    const privateKey = Utils.fromBase64(this.keyRing.getPrivateCommKey());
-    return await NaCl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
-  }
-
   // ---------- Relay message commands (public API) ----------
 
   /**
@@ -305,6 +263,29 @@ export class Mailbox {
   // ---------- Dealing with Relay ----------
 
   /**
+   * Establishes a session, exchanges temp keys and proves our ownership of this
+   * Mailbox to this specific relay. This is the first function to start
+   * communications with any relay. Returns the number of messages in the mailbox
+   */
+  async connectToRelay(url: string): Promise<number> {
+    const relay = await Relay.getInstance(url);
+    const connectionData = await relay.openConnection();
+    const encryptedSignature = await this.encryptSignature(connectionData);
+
+    const messagesNumber = await relay.prove(await relay.encodeMessage({
+      pub_key: this.keyRing.getPubCommKey(),
+      nonce: encryptedSignature.nonce,
+      ctext: encryptedSignature.ctext
+    }));
+    return parseInt(messagesNumber, 10);
+  }
+
+  private async encryptSignature(connectionData: RelayConnectionData) {
+    const privateKey = Utils.fromBase64(this.keyRing.getPrivateCommKey());
+    return await NaCl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
+  }
+
+  /**
    * Gets a singleton Relay instance, and reconnects to a relay if a previous token has expired
    */
   private async prepareRelay(url: string): Promise<Relay> {
@@ -320,7 +301,7 @@ export class Mailbox {
    */
   private async runRelayCommand(relay: Relay, command: RelayCommand, params?: any, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
-    const hpk = await this.getHpk();
+    const hpk = await this.keyRing.getHpk();
     const message = await relay.encodeMessage(params);
     return await relay.runCmd(command, hpk, message, ctext);
   }

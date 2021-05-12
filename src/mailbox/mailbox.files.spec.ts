@@ -22,8 +22,8 @@ describe('Mailbox / File transfer', () => {
 
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
-    const aliceKey = Alice.getPubCommKey();
-    const bobKey = Bob.getPubCommKey();
+    const aliceKey = Alice.keyRing.getPubCommKey();
+    const bobKey = Bob.keyRing.getPubCommKey();
     await Alice.keyRing.addGuest('Bob', bobKey);
     await Bob.keyRing.addGuest('Alice', aliceKey);
 

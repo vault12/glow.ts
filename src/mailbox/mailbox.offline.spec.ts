@@ -15,13 +15,13 @@ describe('Mailbox / Offline tests', () => {
   it('exchange keys', async () => {
     expect(Alice.keyRing.getNumberOfGuests()).toBe(0);
     expect(Alice.keyRing.getGuestKey('Bob_mbx')).toBeNull();
-    await Alice.keyRing.addGuest('Bob_mbx', Bob.getPubCommKey());
+    await Alice.keyRing.addGuest('Bob_mbx', Bob.keyRing.getPubCommKey());
     expect(Alice.keyRing.getNumberOfGuests()).toBe(1);
     expect(Alice.keyRing.getGuestKey('Bob_mbx')).not.toBeNull();
 
     expect(Bob.keyRing.getNumberOfGuests()).toBe(0);
     expect(Bob.keyRing.getGuestKey('Alice_mbx')).toBeNull();
-    await Bob.keyRing.addGuest('Alice_mbx', Alice.getPubCommKey());
+    await Bob.keyRing.addGuest('Alice_mbx', Alice.keyRing.getPubCommKey());
     expect(Bob.keyRing.getNumberOfGuests()).toBe(1);
     expect(Bob.keyRing.getGuestKey('Alice_mbx')).not.toBeNull();
   });
@@ -29,7 +29,7 @@ describe('Mailbox / Offline tests', () => {
   it('Mailbox from a well known seed', async () => {
     const mbx = await Mailbox.fromSeed('from_seed', Utils.encode_latin1('hello'));
     expect(mbx.keyRing.getPubCommKey()).toBe('2DM+z1PaxGXVnzsDh4zv+IlH7sV8llEFoEmg9fG3pRA=');
-    expect(await mbx.getHpk()).toEqual('+dFaY/wsuxsNZeXH6x/rd+AZz9degkfmLBbZAMkpPd4=');
+    expect(await mbx.keyRing.getHpk()).toEqual('+dFaY/wsuxsNZeXH6x/rd+AZz9degkfmLBbZAMkpPd4=');
   });
 
   it('Mailbox backup & restore', async () => {
@@ -40,14 +40,14 @@ describe('Mailbox / Offline tests', () => {
     const mbx = await Mailbox.fromSeed('from_seed2', Utils.encode_latin1('hello2'));
 
     expect(mbx.keyRing.getPubCommKey()).toBe(pubCommKey);
-    expect(await mbx.getHpk()).toEqual(Utils.toBase64(hpk));
+    expect(await mbx.keyRing.getHpk()).toEqual(Utils.toBase64(hpk));
 
     const backup = await mbx.keyRing.backup();
 
     const restoredMbx = await Mailbox.fromBackup('from_backup', backup);
 
     expect(restoredMbx.keyRing.getPubCommKey()).toBe(pubCommKey);
-    expect(await restoredMbx.getHpk()).toEqual(Utils.toBase64(hpk));
+    expect(await restoredMbx.keyRing.getHpk()).toEqual(Utils.toBase64(hpk));
   });
 
   it('encrypts & decrypts strings between mailboxes', async () => {
