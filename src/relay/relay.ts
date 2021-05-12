@@ -3,6 +3,7 @@ import { Mutex } from 'async-mutex';
 
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
+import { EncryptionHelper } from '../nacl/encryption.helper';
 import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
@@ -136,7 +137,7 @@ export class Relay {
 
     const privateKey = this.sessionKeys.privateKey;
 
-    return await NaCl.rawEncodeMessage(message, relayPk, Utils.fromBase64(privateKey));
+    return await EncryptionHelper.encodeMessage(message, relayPk, Utils.fromBase64(privateKey));
   }
 
   async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
@@ -147,7 +148,7 @@ export class Relay {
 
     const privateKey = this.sessionKeys.privateKey;
 
-    return await NaCl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
+    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
       Utils.fromBase64(privateKey));
   }
 

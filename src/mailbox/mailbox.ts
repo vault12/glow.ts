@@ -1,5 +1,6 @@
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
+import { EncryptionHelper } from '../nacl/encryption.helper';
 import { KeyRing } from '../keyring/keyring';
 import { Base64, Utils } from '../utils/utils';
 import { Relay, RelayConnectionData } from '../relay/relay';
@@ -205,7 +206,7 @@ export class Mailbox {
   async uploadFileChunk(url: string, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
     const relay = await this.prepareRelay(url);
-    const encodedChunk = await this.encodeMessageSymmetric(chunk, skey);
+    const encodedChunk = await EncryptionHelper.encodeMessageSymmetric(chunk, skey);
     const response = await this.runRelayCommand(relay, RelayCommand.uploadFileChunk, {
       uploadID,
       part,
@@ -247,7 +248,7 @@ export class Mailbox {
     const response = await this.runRelayCommand(relay, RelayCommand.downloadFileChunk, { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
     const decoded = await relay.decodeMessage(nonce, ctext);
-    return await this.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
+    return await EncryptionHelper.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
   /**
@@ -280,9 +281,9 @@ export class Mailbox {
     return parseInt(messagesNumber, 10);
   }
 
-  private async encryptSignature(connectionData: RelayConnectionData) {
+  private async encryptSignature(connection: RelayConnectionData) {
     const privateKey = Utils.fromBase64(this.keyRing.getPrivateCommKey());
-    return await NaCl.rawEncodeMessage(connectionData.h2Signature, connectionData.relayPublicKey, privateKey);
+    return await EncryptionHelper.encodeMessage(connection.h2Signature, connection.relayPublicKey, privateKey);
   }
 
   /**
@@ -325,7 +326,7 @@ export class Mailbox {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    return await NaCl.rawEncodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    return await EncryptionHelper.encodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   /**
@@ -335,28 +336,8 @@ export class Mailbox {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    return await NaCl.rawDecodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
-  }
-
-  /**
-   * Encodes a binary message with `secretbox` (used for file chunk encryption)
-   */
-  private async encodeMessageSymmetric(message: Uint8Array, secretKey: Uint8Array): Promise<EncryptedMessage> {
-    const nonce = await NaCl.makeNonce();
-    const ctext = await this.nacl.crypto_secretbox(message, nonce, secretKey);
-    return {
-      nonce: Utils.toBase64(nonce),
-      ctext: Utils.toBase64(ctext)
-    };
-  }
-
-  /**
-   * Decodes a binary message with `secretbox_open` (used for file chunk decryption)
-   */
-  private async decodeMessageSymmetric(nonce: Base64, ctext: Base64,
-    secretKey: Uint8Array): Promise<Uint8Array | null> {
-    return await this.nacl.crypto_secretbox_open(Utils.fromBase64(ctext), Utils.fromBase64(nonce), secretKey);
   }
 
   /**
