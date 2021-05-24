@@ -2,8 +2,8 @@
   "compileOnSave": false,
   "compilerOptions": {
     "moduleResolution": "node",
-    "module": "esnext",
-    "target": "es2018",
+    "module": "es2020",
+    "target": "es2020",
     "lib": [
       "dom",
       "es2018"
@@ -16,13 +16,12 @@
     "declaration": true,
     "declarationMap": true,
     "declarationDir": "dist/types",
-    "outDir": "dist/",
+    "outDir": "dist/esm",
     "resolveJsonModule": true,
     "noImplicitAny": true
   },
-  "include": [
-    "./src"
-  ],
+  "files": [ "src/index.ts" ],
+  "main": "src/index.ts",
   "exclude": [
     "**/*.spec.ts"
   ]

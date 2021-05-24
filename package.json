@@ -1,6 +1,6 @@
 {
   "name": "@vault12/glow.ts",
-  "version": "0.0.1",
+  "version": "0.0.14",
   "displayName": "Glow.ts",
   "description": "Client library for interacting with Zax Cryptographic Relay Servers",
   "keywords": [
@@ -23,14 +23,15 @@
   "homepage": "https://github.com/vault12/glow.ts#readme",
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc --module commonjs --target es2018 --outDir dist/cjs",
     "lint": "eslint 'src/**'",
     "lint:fix": "eslint 'src/**' --fix",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch"
   },
-  "main": "dist/glow.js",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
   "dependencies": {
     "async-mutex": "0.3.1",
