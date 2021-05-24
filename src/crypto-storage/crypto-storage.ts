@@ -23,7 +23,15 @@ export class CryptoStorage {
 
   static async new(storageDriver: StorageDriver, rootKey?: string): Promise<CryptoStorage> {
     const storage = new CryptoStorage(storageDriver, rootKey);
-    storage.storageKey = await storage.nacl.random_bytes(storage.nacl.crypto_secretbox_KEYBYTES);
+    const prefixedStorageKey = storage.addPrefix(config.SKEY_TAG);
+    const storageKey = await storageDriver.get(prefixedStorageKey);
+    if (storageKey) {
+      const { key } = JSON.parse(storageKey);
+      storage.storageKey = Utils.fromBase64(key);
+    } else {
+      storage.storageKey = await storage.nacl.random_bytes(storage.nacl.crypto_secretbox_KEYBYTES);
+      await storageDriver.set(prefixedStorageKey, JSON.stringify({ key: Utils.toBase64(storage.storageKey)}));
+    }
     return storage;
   }
 
@@ -78,6 +86,13 @@ export class CryptoStorage {
     await this.driver.remove(this.addPrefix(tag));
     await this.driver.remove(this.addNonceTag(tag));
     return true;
+  }
+
+  async selfDestruct() {
+    if (!this.driver) {
+      throw new Error('[CryptoStorage] Storage driver is not set');
+    }
+    await this.driver.remove(this.addPrefix(config.SKEY_TAG));
   }
 
   // Keys are tagged in the storage with a versioned prefix
