@@ -350,4 +350,16 @@ export class Mailbox {
     }
     return guestPk;
   }
+
+  // ---------- Destroying Mailbox ----------
+
+  /**
+   * Deletes a Mailbox and all its data from local CryptoStorage. This is a very
+   * destructive operation, use with caution - it will delete the Mailbox
+   * keyring along with all stored public keys. To restore that information, you
+   * will need to do another key exchange with all the guests on your keyring.
+   */
+  async selfDestruct() {
+    await this.keyRing.selfDestruct();
+  }
 }
