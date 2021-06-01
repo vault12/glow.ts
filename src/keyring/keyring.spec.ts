@@ -32,6 +32,12 @@ describe('Keyring', () => {
     expect(ring.getGuestKey('Bob')).toBeDefined();
   });
 
+  it('create equal keys', async () => {
+    const ring = await KeyRing.new('test-equal');
+    const ring2 = await KeyRing.new('test-equal');
+    expect(ring.getPubCommKey()).toBe(ring2.getPubCommKey());
+  });
+
   it('get tags and keys', async() => {
     const ring = await KeyRing.new('test2');
     const commKey = ring.getPubCommKey();

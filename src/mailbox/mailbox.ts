@@ -45,8 +45,11 @@ export class Mailbox {
   /**
    * Create a Mailbox where the secret identity key is derived from a well-known seed
    */
-  static async fromSeed(id: string, seed: Uint8Array): Promise<Mailbox> {
+  static async fromSeed(id: string, seed: Uint8Array | string): Promise<Mailbox> {
     const mbx = await this.new(id);
+    if (!(seed instanceof Uint8Array)) {
+      seed = Utils.encode_latin1(seed);
+    }
     await mbx.keyRing.setCommFromSeed(seed);
     return mbx;
   }
@@ -54,8 +57,11 @@ export class Mailbox {
   /**
    * Create a Mailbox from the known secret identity key
    */
-  static async fromSecKey(id: string, rawSecretKey: Uint8Array): Promise<Mailbox> {
+  static async fromSecKey(id: string, rawSecretKey: Uint8Array | Base64): Promise<Mailbox> {
     const mbx = await this.new(id);
+    if (!(rawSecretKey instanceof Uint8Array)) {
+      rawSecretKey = Utils.fromBase64(rawSecretKey);
+    }
     await mbx.keyRing.setCommFromSecKey(rawSecretKey);
     return mbx;
   }
@@ -349,5 +355,17 @@ export class Mailbox {
       throw new Error(`[Mailbox] Unknown guest ${guest}`);
     }
     return guestPk;
+  }
+
+  // ---------- Destroying Mailbox ----------
+
+  /**
+   * Deletes a Mailbox and all its data from local CryptoStorage. This is a very
+   * destructive operation, use with caution - it will delete the Mailbox
+   * keyring along with all stored public keys. To restore that information, you
+   * will need to do another key exchange with all the guests on your keyring.
+   */
+  async selfDestruct() {
+    await this.keyRing.selfDestruct();
   }
 }

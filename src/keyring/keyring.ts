@@ -40,7 +40,7 @@ export class KeyRing {
     const commKey = await KeyRing.getCommKey(nacl, cryptoStorage);
     const keyRing = new KeyRing(nacl, cryptoStorage, commKey);
 
-    await cryptoStorage.save(KeyRing.commKeyTag, commKey);
+    await cryptoStorage.save(KeyRing.commKeyTag, commKey.toString());
     await keyRing.loadGuestKeys();
     return keyRing;
   }
@@ -60,6 +60,10 @@ export class KeyRing {
 
   getNumberOfGuests(): number {
     return this.guestKeys.size;
+  }
+
+  get guests(): Map<string, KeyRecord> {
+    return this.guestKeys;
   }
 
   /**
@@ -169,5 +173,11 @@ export class KeyRing {
       const keypair = await nacl.crypto_box_keypair();
       return new Keys(keypair);
     }
+  }
+
+  async selfDestruct() {
+    await this.storage.remove(KeyRing.guestRegistryTag);
+    await this.storage.remove(KeyRing.commKeyTag);
+    await this.storage.selfDestruct();
   }
 }
