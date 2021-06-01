@@ -23,14 +23,15 @@ export class CryptoStorage {
 
   static async new(storageDriver: StorageDriver, rootKey?: string): Promise<CryptoStorage> {
     const storage = new CryptoStorage(storageDriver, rootKey);
-    const prefixedStorageKey = storage.addPrefix(config.SKEY_TAG);
-    const storageKey = await storageDriver.get(prefixedStorageKey);
+    const prefixedStorageKeyTag = storage.addPrefix(config.SKEY_TAG);
+    const storageKey = await storageDriver.get(prefixedStorageKeyTag);
+    // Either load or generate a storage key
     if (storageKey) {
       const { key } = JSON.parse(storageKey);
       storage.storageKey = Utils.fromBase64(key);
     } else {
       storage.storageKey = await storage.nacl.random_bytes(storage.nacl.crypto_secretbox_KEYBYTES);
-      await storageDriver.set(prefixedStorageKey, JSON.stringify({ key: Utils.toBase64(storage.storageKey)}));
+      await storageDriver.set(prefixedStorageKeyTag, JSON.stringify({ key: Utils.toBase64(storage.storageKey)}));
     }
     return storage;
   }
