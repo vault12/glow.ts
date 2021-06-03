@@ -246,10 +246,14 @@ export class Mailbox {
   }
 
   /**
-   * Downloads a binary chunk of a file from a relay by a given uploadID.  The total number of chunks
+   * Downloads a binary chunk of a file from a relay by a given uploadID. The total number of chunks
    * can be retrieved via a `getFileStatus` request
    */
-  async downloadFileChunk(url: string, uploadID: string, part: number, skey: Uint8Array): Promise<Uint8Array | null> {
+  async downloadFileChunk(url: string, uploadID: string, part: number, skey: Uint8Array | Base64):
+    Promise<Uint8Array | null> {
+    if (!(skey instanceof Uint8Array)) {
+      skey = Utils.fromBase64(skey);
+    }
     const relay = await this.prepareRelay(url);
     const response = await this.runRelayCommand(relay, RelayCommand.downloadFileChunk, { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
