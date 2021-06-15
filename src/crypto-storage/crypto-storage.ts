@@ -3,26 +3,31 @@ import { Utils } from '../utils/utils';
 import { config } from '../config';
 import { StorageDriver } from './storage-driver.interface';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
+import { LocalStorageDriver } from './local-storage.driver';
 
 // TODO: add bulk operations to set(), get() and remove() pairs of values simultaneously
 
 /* CryptoStorage is a handy wrapper around any storage that provides JavaScript interface,
    that allows to store symmetrically encrypted serializable Javascript objects and primitives. */
 export class CryptoStorage {
+
+  private static storageDriver: StorageDriver;
+
   private driver?: StorageDriver;
-  private rootKey?: string;
+  private id?: string;
   private storageKey?: Uint8Array;
   private nacl: NaClDriver;
 
-  private constructor(storageDriver: StorageDriver, rootKey?: string) {
+  private constructor(storageDriver: StorageDriver, id: string) {
     const nacl = NaCl.getInstance();
     this.nacl = nacl;
     this.driver = storageDriver;
-    this.rootKey = rootKey ? `.${rootKey}${config.STORAGE_ROOT}` : config.STORAGE_ROOT;
+    this.id = id ? `.${id}${config.STORAGE_ROOT}` : config.STORAGE_ROOT;
   }
 
-  static async new(storageDriver: StorageDriver, rootKey?: string): Promise<CryptoStorage> {
-    const storage = new CryptoStorage(storageDriver, rootKey);
+  static async new(id: string): Promise<CryptoStorage> {
+    const storageDriver = this.getStorageDriver();
+    const storage = new CryptoStorage(storageDriver, id);
     const prefixedStorageKeyTag = storage.addPrefix(config.SKEY_TAG);
     const storageKey = await storageDriver.get(prefixedStorageKeyTag);
     // Either load or generate a storage key
@@ -34,6 +39,23 @@ export class CryptoStorage {
       await storageDriver.set(prefixedStorageKeyTag, JSON.stringify({ key: Utils.toBase64(storage.storageKey)}));
     }
     return storage;
+  }
+
+  static getStorageDriver() {
+    if (!this.storageDriver) {
+      throw new Error('[CryptoStorage] StorageDriver instance is not yet set');
+    } else {
+      return this.storageDriver;
+    }
+  }
+
+  static setStorageDriver(driver: StorageDriver = new LocalStorageDriver()) {
+    if (this.storageDriver) {
+      throw new Error('[NaCl] NaCl driver has been already set, it is supposed to be set only once');
+    } else {
+      this.storageDriver = driver;
+    }
+    return true;
   }
 
   async save(tag: string, data: unknown): Promise<boolean> {
@@ -98,7 +120,7 @@ export class CryptoStorage {
 
   // Keys are tagged in the storage with a versioned prefix
   private addPrefix(key: string): string {
-    return this.rootKey ? (key + this.rootKey) : key;
+    return this.id ? (key + this.id) : key;
   }
 
   private addNonceTag(tag: string): string {
