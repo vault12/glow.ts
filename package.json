@@ -1,6 +1,6 @@
 {
-  "name": "@vault12/glow.ts",
-  "version": "0.0.31",
+  "name": "glow.ts",
+  "version": "0.1.0",
   "displayName": "Glow.ts",
   "description": "Client library for interacting with Zax Cryptographic Relay Servers",
   "keywords": [
