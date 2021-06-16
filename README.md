@@ -12,6 +12,9 @@
   <a href="http://makeapullrequest.com">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
   </a>
+  <a href="https://npmjs.com/package/glow.ts">
+    <img src="https://img.shields.io/npm/v/glow.ts" alt="PRs welcome" />
+  </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
   </a>
@@ -29,13 +32,21 @@
   </a>
 </p>
 
-Glow is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg).
+**Glow.ts** is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg). This reference implementation is written in TypeScript. The original deprecated implementation in CoffeeScript can be [found there](https://github.com/vault12/glow).
+
+## Test Dashboard
+
+**Glow.ts** powers a test [Dashboard app](https://github.com/vault12/zax-dashboard) to provide a user-friendly access point to encrypted Mailboxes on a given relay.
+
+We maintain a live [Test Server](https://zt.vault12.com) that runs the stable build of Zax Dashboard. For testing purposes expiration of any communication on that relay is set to *30 minutes*.
+
+You can also check the latest build of `master` branch on [Github Pages](https://vault12.github.io/zax-dashboard/).
 
 ## Running tests
 
 Unit tests are powered by [Jest](https://jestjs.io). The engine runs all the tests in each `describe` section serially in the order they are described in the `.spec.ts` file.
 By default, unit tests connect to a remote [Zax](https://github.com/vault12/zax) Cryptographic Relay Server on `https://z.vault12.com`.
-You may also run tests on a local or any other test server by modifying the code in [src/tests.helper.ts#L1](src/tests.helper.ts#L1).
+You may also run tests on a local or any other test server by modifying the code in the [tests helper](src/tests.helper.ts#L1).
 
 ## Ecosystem
 
