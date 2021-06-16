@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://travis-ci.com/vault12/glow-ts">
-    <img src="https://travis-ci.com/vault12/glow-ts.svg?branch=master" alt="Travis Build Status" />
+  <a href="https://travis-ci.com/vault12/glow.ts">
+    <img src="https://travis-ci.com/vault12/glow.ts.svg?branch=master" alt="Travis Build Status" />
   </a>
   <a href="http://makeapullrequest.com">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
@@ -18,11 +18,11 @@
 </p>
 
 <p align="center">
-  <a href="https://david-dm.org/vault12/glow-ts#info=dependencies">
-    <img src="https://david-dm.org/vault12/glow-ts.svg" alt="dependency Status" />
+  <a href="https://david-dm.org/vault12/glow.ts#info=dependencies">
+    <img src="https://david-dm.org/vault12/glow.ts.svg" alt="dependency Status" />
   </a>
-  <a href="https://david-dm.org/vault12/glow-ts#info=devDependencies">
-    <img src="https://david-dm.org/vault12/glow-ts/dev-status.svg" alt="devDependency Status" />
+  <a href="https://david-dm.org/vault12/glow.ts#info=devDependencies">
+    <img src="https://david-dm.org/vault12/glow.ts/dev-status.svg" alt="devDependency Status" />
   </a>
   <a href="https://twitter.com/_Vault12_">
     <img src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" alt="Follow" />
