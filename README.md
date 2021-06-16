@@ -34,7 +34,17 @@
 
 **Glow.ts** is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg). This reference implementation is written in TypeScript. The original deprecated implementation in CoffeeScript can be [found there](https://github.com/vault12/glow).
 
-## Test Dashboard
+## Installation
+
+Glow can be easily installed via `npm`, which is included when you install [Node.js](https://nodejs.org/).
+In a terminal, navigate to the directory in which you'd like to install Glow and type the following:
+```Shell
+npm install glow.ts
+```
+The built version of Glow will be available in `node_modules/glow.ts/dist` subdirectory, packaged as both
+CommonJS and ESM library.
+
+## Dashboard app
 
 **Glow.ts** powers a test [Dashboard app](https://github.com/vault12/zax-dashboard) to provide a user-friendly access point to encrypted Mailboxes on a given relay.
 
