@@ -1,13 +1,13 @@
 # glow.ts
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/1370944/122228028-1ec1eb80-cec0-11eb-9c10-bf2605034da5.jpg"
+  <img src="https://user-images.githubusercontent.com/1370944/122228957-056d6f00-cec1-11eb-82a1-03dc85e89d83.jpg"
     alt="Glow">
 </p>
 
 <p align="center">
-  <a href="https://travis-ci.com/vault12/glow.ts">
-    <img src="https://travis-ci.com/vault12/glow.ts.svg?branch=master" alt="Travis Build Status" />
+  <a href="https://travis-ci.com/vault12/glow-ts">
+    <img src="https://travis-ci.com/vault12/glow-ts.svg?branch=master" alt="Travis Build Status" />
   </a>
   <a href="http://makeapullrequest.com">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
@@ -18,11 +18,11 @@
 </p>
 
 <p align="center">
-  <a href="https://david-dm.org/vault12/glow.ts#info=dependencies">
-    <img src="https://david-dm.org/vault12/glow.ts.svg" alt="dependency Status" />
+  <a href="https://david-dm.org/vault12/glow-ts#info=dependencies">
+    <img src="https://david-dm.org/vault12/glow-ts.svg" alt="dependency Status" />
   </a>
-  <a href="https://david-dm.org/vault12/glow.ts#info=devDependencies">
-    <img src="https://david-dm.org/vault12/glow.ts/dev-status.svg" alt="devDependency Status" />
+  <a href="https://david-dm.org/vault12/glow-ts#info=devDependencies">
+    <img src="https://david-dm.org/vault12/glow-ts/dev-status.svg" alt="devDependency Status" />
   </a>
   <a href="https://twitter.com/_Vault12_">
     <img src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" alt="Follow" />
@@ -42,7 +42,7 @@ You may also run tests on a local or any other test server by modifying the code
 Project | Description
 --- | ---
 [Zax](https://github.com/vault12/zax) | NaCl-based Cryptographic Relay
-[Zax Dashboard](https://github.com/vault12/glow.ts) | Sample dashboard app for Zax Cryptographic Relay
+[Zax Dashboard](https://github.com/vault12/zax-dashboard) | Sample dashboard app for Zax Cryptographic Relay
 [TrueEntropy](https://github.com/vault12/TrueEntropy) | High volume thermal entropy generator
 
 ## License
