@@ -1,5 +1,4 @@
 import { CryptoStorage } from './crypto-storage';
-import { LocalStorageDriver } from './local-storage.driver';
 import { NaCl } from '../nacl/nacl';
 
 describe('CryptoStorage', () => {
@@ -7,7 +6,8 @@ describe('CryptoStorage', () => {
 
   beforeAll(async () => {
     NaCl.setInstance();
-    storage = await CryptoStorage.new(new LocalStorageDriver(), 'test');
+    CryptoStorage.setStorageDriver();
+    storage = await CryptoStorage.new('test');
   });
 
   it('ASCII string write/read', async () => {

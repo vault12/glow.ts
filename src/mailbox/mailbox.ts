@@ -19,6 +19,9 @@ import {
   ZaxTextMessage,
   ZaxParsedMessage
 } from '../zax.interface';
+import { RelayFactory } from '../relay/relay-factory';
+import { Mutex } from 'async-mutex';
+
 
 /**
  * Mailbox class represents a wrapper around a Keyring that allows to exchange
@@ -27,6 +30,15 @@ import {
 export class Mailbox {
   public keyRing: KeyRing;
   public identity: string;
+  /**
+   * each mailbox use it's own relays for connection
+   * this gives possibility to connect different mailboxes to same server simultaneously
+   * because they will use different session keys, tokens, server pub keys
+   */
+
+  private relayFactory = new RelayFactory;
+
+  private relayConnectionMutex = new Map<string, Mutex>();
 
   private nacl: NaClDriver;
 
@@ -279,7 +291,7 @@ export class Mailbox {
    * communications with any relay. Returns the number of messages in the mailbox
    */
   async connectToRelay(url: string): Promise<number> {
-    const relay = await Relay.getInstance(url);
+    const relay = this.relayFactory.getInstance(url);
     const connectionData = await relay.openConnection();
     const encryptedSignature = await this.encryptSignature(connectionData);
 
@@ -300,10 +312,15 @@ export class Mailbox {
    * Gets a singleton Relay instance, and reconnects to a relay if a previous token has expired
    */
   private async prepareRelay(url: string): Promise<Relay> {
-    const relay = await Relay.getInstance(url);
-    if (relay.isTokenExpired) {
-      await this.connectToRelay(url);
-    }
+    const relay = await this.relayFactory.getInstance(url);
+    /**
+     * allow establishing only once connection for pair mailbox-relay
+     */
+    await this.getRelayConnectionMutex(url).runExclusive(async () => {
+      if (!relay.isConnected) {
+        await this.connectToRelay(url);
+      }
+    });
     return relay;
   }
 
@@ -371,5 +388,12 @@ export class Mailbox {
    */
   async selfDestruct() {
     await this.keyRing.selfDestruct();
+  }
+
+  private getRelayConnectionMutex(url: string) {
+    if (!this.relayConnectionMutex.has(url)) {
+      this.relayConnectionMutex.set(url, new Mutex());
+    }
+    return this.relayConnectionMutex.get(url) as Mutex;
   }
 }

@@ -2,6 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { randomNumber, testRelayURL } from '../tests.helper';
 import { FileUploadMetadata } from '../zax.interface';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 
 describe('Mailbox / File transfer', () => {
 
@@ -19,6 +20,7 @@ describe('Mailbox / File transfer', () => {
 
   beforeAll(async () => {
     NaCl.setInstance();
+    CryptoStorage.setStorageDriver();
 
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');

@@ -2,6 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { testRelayURL } from '../tests.helper';
 import { MessageStatusResponse } from '../zax.interface';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 import { config } from '../config';
 import { Relay } from '../relay/relay';
 
@@ -13,6 +14,7 @@ describe('Mailbox / Messages', () => {
 
   beforeAll(async () => {
     NaCl.setInstance();
+    CryptoStorage.setStorageDriver();
 
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
@@ -71,21 +73,18 @@ describe('Mailbox / Messages', () => {
     expect(message.data).toBe('some unencrypted message');
   });
 
-  it('should reconnect after token expiration timeout', async () => {
+  it('should reconnect after session expiration timeout', async () => {
     jest.useFakeTimers();
     await Bob.connectToRelay(testRelayURL);
-    const relay = await Relay.getInstance(testRelayURL);
     const connectSpy = jest.spyOn(Bob, 'connectToRelay');
 
     // fast-forward to where the token is not yet expired
-    jest.advanceTimersByTime(config.RELAY_TOKEN_TIMEOUT - 1);
-    expect(relay.isTokenExpired).toBe(false);
+    jest.advanceTimersByTime(config.RELAY_SESSION_TIMEOUT - 1);
     await Bob.download(testRelayURL);
     expect(connectSpy).not.toHaveBeenCalled();
 
     // has to reconnect under the hood when a token expires
     jest.advanceTimersByTime(2);
-    expect(relay.isTokenExpired).toBe(true);
     await Bob.download(testRelayURL);
     expect(connectSpy).toHaveBeenCalledTimes(1);
 

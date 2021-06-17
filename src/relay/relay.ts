@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { Mutex } from 'async-mutex';
 
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
@@ -21,45 +20,18 @@ export class Relay {
   private nacl: NaClDriver;
   private difficulty = 0;
   private publicKey?: Uint8Array;
-  private tokenExpired = false;
-
-  // Static global dictionary of relays to refer to, because the apps using this library
-  // only need a single instance of a Relay class per given URL.
-  private static relays: { [url: string]: Relay } = {};
+  private clientToken?: Uint8Array;
+  private sessionKeys?: Keys;
+  private tokenExpirationTimeoutHandle?: any;
+  private sessionExpirationTimeoutHandle?: any;
   // Ensures that a call to the static getInstance() method is blocking
-  private static instanceMutex = new Mutex();
 
-  private constructor(public url: string, private clientToken: Uint8Array, private sessionKeys: Keys) {
+  constructor(public url: string) {
     this.nacl = NaCl.getInstance();
   }
 
-  private static async new(url: string): Promise<Relay> {
-    const nacl = NaCl.getInstance();
-    // Generate a client token. It will be used as part of handshake id with relay
-    const clientToken = await nacl.random_bytes(config.RELAY_TOKEN_LEN);
-    // Generate and store a pair of keys required to start a relay session.
-    // Each session with each Zax relay creates its own temporary session keys
-    const sessionKeys = new Keys(await nacl.crypto_box_keypair());
-    return new Relay(url, clientToken, sessionKeys);
-  }
-
-  /**
-   * Relay factory, that returns a Relay instance for a given URL,
-   * or creates a new one if it hasn't yet been initialized.
-   * The usage of `async-mutex` guarantees that only one instance per given URL will ever exist.
-   */
-  static async getInstance(url: string): Promise<Relay> {
-    return await this.instanceMutex.runExclusive(async () => {
-      let relay = this.relays[url];
-      if (!relay) {
-        relay = this.relays[url] = await Relay.new(url);
-      }
-      return relay;
-    });
-  }
-
-  get isTokenExpired() {
-    return this.tokenExpired;
+  get isConnected() {
+    return this.sessionKeys && this.publicKey;
   }
 
   // ---------- Connection initialization ----------
@@ -70,12 +42,13 @@ export class Relay {
    */
   async openConnection(): Promise<RelayConnectionData> {
     // reset token expiration flag, since we are reconnecting again
-    this.tokenExpired = false;
+    this.sessionKeys = new Keys(await this.nacl.crypto_box_keypair());
+    this.clientToken = await this.nacl.random_bytes(config.RELAY_TOKEN_LEN);
     const relayToken = await this.fetchRelayToken();
-    const relayPublicKey = await this.fetchRelayPublicKey(relayToken);
+    this.publicKey = await this.fetchRelayPublicKey(relayToken);
     return {
-      h2Signature: await this.getSignature(relayToken),
-      relayPublicKey
+      h2Signature: await this.getSignature(relayToken, this.sessionKeys),
+      relayPublicKey: this.publicKey
     };
   }
 
@@ -83,9 +56,12 @@ export class Relay {
    * Sends a client token to a relay and saves a relay token
    */
   private async fetchRelayToken(): Promise<Uint8Array> {
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
     // Set a timer to mark a relay instance as having an expired token after a certain time
-    this.scheduleExpiration();
+    this.scheduleTokenExpiration();
     // Relay responds with its own counter token. Until session is established these 2 tokens are handshake id.
     const [token, difficulty] = this.parseResponse('start_session', data);
 
@@ -100,7 +76,10 @@ export class Relay {
   /**
    * Completes the handshake and saves a relay pubic key
    */
-  private async fetchRelayPublicKey(relayToken: Uint8Array): Promise<Uint8Array> {
+  private async fetchRelayPublicKey(relayToken: Uint8Array) {
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
     // After clientToken is sent to the relay, we use only h2() of it
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
 
@@ -117,27 +96,36 @@ export class Relay {
     // We confirm handshake by sending back h2(clientToken, relay_token)
     const relayPk = await this.httpCall('verify_session', h2ClientToken, Utils.toBase64(sessionHandshake));
     // Relay gives us back temp session key masked by clientToken we started with
-    this.publicKey = Utils.fromBase64(relayPk);
-    return this.publicKey;
+    return Utils.fromBase64(relayPk);
   }
 
   /**
    * Attaches a mailbox and fetches number of messages
    */
   async prove(payload: EncryptedMessage): Promise<string> {
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required');
+    }
+    if (!this.sessionKeys) {
+      throw new Error('[Relay] No session key found, open the connection first');
+    }
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
-    return await this.httpCall('prove', h2ClientToken, this.sessionKeys.publicKey, payload.nonce, payload.ctext);
+    const result = await this.httpCall('prove',
+      h2ClientToken, this.sessionKeys.publicKey, payload.nonce, payload.ctext);
+    this.scheduleSessionExpiration();
+    return result;
   }
 
   async encodeMessage(message: any): Promise<EncryptedMessage> {
-    const relayPk = this.publicKey;
-    if (!relayPk) {
+    if (!this.publicKey) {
       throw new Error('[Relay] No relay public key found, open the connection first');
     }
+    if (!this.sessionKeys) {
+      throw new Error('[Relay] No session key found, open the connection first');
+    }
 
-    const privateKey = this.sessionKeys.privateKey;
-
-    return await EncryptionHelper.encodeMessage(message, relayPk, Utils.fromBase64(privateKey));
+    return await EncryptionHelper.encodeMessage(
+      message, this.publicKey, Utils.fromBase64(this.sessionKeys?.privateKey));
   }
 
   async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
@@ -145,11 +133,12 @@ export class Relay {
     if (!relayPk) {
       throw new Error('[Relay] No relay public key found, open the connection first');
     }
-
-    const privateKey = this.sessionKeys.privateKey;
+    if (!this.sessionKeys) {
+      throw new Error('[Relay] No session key found, open the connection first');
+    }
 
     return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
-      Utils.fromBase64(privateKey));
+      Utils.fromBase64(this.sessionKeys.privateKey));
   }
 
   // ---------- Low-level server request handling ----------
@@ -172,8 +161,11 @@ export class Relay {
     return this.parseResponse(command, response);
   }
 
-  private async getSignature(relayToken: Uint8Array) {
-    const clientTempPk = Utils.fromBase64(this.sessionKeys.publicKey);
+  private async getSignature(relayToken: Uint8Array, sessionKeys: Keys) {
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
+    const clientTempPk = Utils.fromBase64(sessionKeys.publicKey);
     // Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
     const signature = new Uint8Array([...clientTempPk, ...relayToken, ...this.clientToken]);
     const h2Signature = await this.nacl.h2(signature);
@@ -235,10 +227,22 @@ export class Relay {
   /**
    * Mark a relay instance as having an expired token, so reconnection is required
    */
-  private scheduleExpiration() {
-    setTimeout(() => {
-      this.tokenExpired = true;
+  private scheduleTokenExpiration() {
+    if (this.tokenExpirationTimeoutHandle) {
+      clearTimeout(this.tokenExpirationTimeoutHandle);
+    }
+    this.tokenExpirationTimeoutHandle = setTimeout(() => {
+      delete this.clientToken;
     }, config.RELAY_TOKEN_TIMEOUT);
+  }
+
+  private scheduleSessionExpiration() {
+    if (this.sessionExpirationTimeoutHandle) {
+      clearTimeout(this.sessionExpirationTimeoutHandle);
+    }
+    this.sessionExpirationTimeoutHandle = setTimeout(() => {
+      delete this.sessionKeys;
+    }, config.RELAY_SESSION_TIMEOUT);
   }
 
   // ---------- Difficulty adjustment ----------
