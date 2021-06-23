@@ -4,7 +4,6 @@ import { testRelayURL } from '../tests.helper';
 import { MessageStatusResponse } from '../zax.interface';
 import { CryptoStorage } from '../crypto-storage/crypto-storage';
 import { config } from '../config';
-import { Relay } from '../relay/relay';
 
 describe('Mailbox / Messages', () => {
   let Alice: Mailbox;
@@ -12,10 +11,12 @@ describe('Mailbox / Messages', () => {
   let nonce: string;
   let token: string;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     NaCl.setInstance();
     CryptoStorage.setStorageDriver();
+  });
 
+  beforeEach(async () => {
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
 
@@ -24,7 +25,6 @@ describe('Mailbox / Messages', () => {
   });
 
   it('send a message', async () => {
-    await Alice.connectToRelay(testRelayURL);
     const wrongRecipient = Alice.upload(testRelayURL, 'Carl', 'some message');
     expect(wrongRecipient).rejects.toThrow(Error);
 
@@ -35,7 +35,6 @@ describe('Mailbox / Messages', () => {
   });
 
   it('count Bob mailbox', async () => {
-    await Bob.connectToRelay(testRelayURL);
     const count = await Bob.count(testRelayURL);
     expect(count).toBe(1);
   });
@@ -58,7 +57,6 @@ describe('Mailbox / Messages', () => {
   });
 
   it('check deleted message status', async () => {
-    await Alice.connectToRelay(testRelayURL);
     const ttl = await Alice.messageStatus(testRelayURL, token);
     expect(ttl).toBe(MessageStatusResponse.MissingKey); // the key is missing on the relay
   });
@@ -66,7 +64,6 @@ describe('Mailbox / Messages', () => {
   it('send unencrypted message', async () => {
     const token = await Alice.upload(testRelayURL, 'Bob', 'some unencrypted message', false);
     expect(token.length).toBeGreaterThan(0);
-    await Bob.connectToRelay(testRelayURL);
     const count = await Bob.count(testRelayURL);
     expect(count).toBe(1);
     const [ message ] = await Bob.download(testRelayURL);

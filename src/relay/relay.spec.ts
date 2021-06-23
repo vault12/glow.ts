@@ -4,13 +4,10 @@ import MockAdapter from 'axios-mock-adapter';
 import { Relay } from './relay';
 import { NaCl } from '../nacl/nacl';
 import { testRelayURL } from '../tests.helper';
-import { NaClDriver } from '../nacl/nacl-driver.interface';
 
 describe('Relay', () => {
-  let nacl: NaClDriver;
   beforeAll(async () => {
     NaCl.setInstance();
-    nacl = NaCl.getInstance();
   });
 
   it('should initialize', async () => {

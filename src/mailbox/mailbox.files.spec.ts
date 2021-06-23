@@ -29,8 +29,6 @@ describe('Mailbox / File transfer', () => {
     await Alice.keyRing.addGuest('Bob', bobKey);
     await Bob.keyRing.addGuest('Alice', aliceKey);
 
-    await Alice.connectToRelay(testRelayURL);
-
     // Generate a random binary file
     file = new Uint8Array(randomNumber(500, 1000)).map(() => randomNumber(0, 255));
 
@@ -76,7 +74,6 @@ describe('Mailbox / File transfer', () => {
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
     expect(statusAlice.bytes_stored).toBeGreaterThan(file.length);
 
-    await Bob.connectToRelay(testRelayURL);
     const statusBob = await Bob.getFileStatus(testRelayURL, uploadID);
     expect(statusBob.status).toBe('COMPLETE');
     expect(statusAlice.file_size).toBe(file.length);

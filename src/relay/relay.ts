@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
@@ -31,7 +31,7 @@ export class Relay {
   }
 
   get isConnected() {
-    return this.sessionKeys && this.publicKey;
+    return !!(this.sessionKeys && this.publicKey);
   }
 
   // ---------- Connection initialization ----------
@@ -157,7 +157,17 @@ export class Relay {
       payload.push(ctext);
     }
 
-    const response = await this.httpCall('command', ...payload);
+    let response: string;
+    try {
+      response = await this.httpCall('command', ...payload);
+    } catch (err: any) {
+      if ((err as AxiosError).isAxiosError &&  (err as AxiosError<any>).response?.status === 401) {
+        // clear session if unauthorized
+        this.clearSession();
+        this.clearToken();
+      }
+      throw err;
+    }
     return this.parseResponse(command, response);
   }
 
@@ -231,9 +241,16 @@ export class Relay {
     if (this.tokenExpirationTimeoutHandle) {
       clearTimeout(this.tokenExpirationTimeoutHandle);
     }
-    this.tokenExpirationTimeoutHandle = setTimeout(() => {
+    this.tokenExpirationTimeoutHandle = setTimeout(() => this.clearToken(), config.RELAY_TOKEN_TIMEOUT);
+  }
+
+  private clearToken() {
+    if (this.tokenExpirationTimeoutHandle) {
+      clearTimeout(this.tokenExpirationTimeoutHandle);
+    }
+    if (this.clientToken) {
       delete this.clientToken;
-    }, config.RELAY_TOKEN_TIMEOUT);
+    }
   }
 
   private scheduleSessionExpiration() {
@@ -241,10 +258,18 @@ export class Relay {
       clearTimeout(this.sessionExpirationTimeoutHandle);
     }
     this.sessionExpirationTimeoutHandle = setTimeout(() => {
-      delete this.sessionKeys;
+      this.clearSession();
     }, config.RELAY_SESSION_TIMEOUT);
   }
 
+  private clearSession() {
+    if (this.sessionExpirationTimeoutHandle) {
+      clearTimeout(this.sessionExpirationTimeoutHandle);
+    }
+    if (this.sessionKeys) {
+      delete this.sessionKeys;
+    }
+  }
   // ---------- Difficulty adjustment ----------
 
   /**

@@ -1,6 +1,4 @@
 import { CryptoStorage } from '../crypto-storage/crypto-storage';
-import { StorageDriver } from '../crypto-storage/storage-driver.interface';
-import { LocalStorageDriver } from '../crypto-storage/local-storage.driver';
 import { Keys } from '../keys/keys';
 import { NaCl } from '../nacl/nacl';
 import { Utils, Base64 } from '../utils/utils';
