@@ -70,8 +70,11 @@ describe('Mailbox / Messages', () => {
     expect(message.data).toBe('some unencrypted message');
   });
 
-  it('should reconnect after session expiration timeout', async () => {
-    jest.useFakeTimers();
+  it('should reconnect after token expiration timeout', async () => {
+    // using 'modern' breaks the test in Jest 27+ environment
+    // See https://jestjs.io/blog/2021/05/25/jest-27#flipping-defaults
+    // TODO: fix this
+    jest.useFakeTimers('legacy');
     await Bob.connectToRelay(testRelayURL);
     const connectSpy = jest.spyOn(Bob, 'connectToRelay');
 

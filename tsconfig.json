@@ -6,7 +6,7 @@
     "target": "es2020",
     "lib": [
       "dom",
-      "es2018"
+      "es2020"
     ],
     "strict": true,
     "esModuleInterop": true,
@@ -21,8 +21,8 @@
     "noImplicitAny": true
   },
   "files": [ "src/index.ts" ],
-  "main": "src/index.ts",
   "exclude": [
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "src/tests.helper.ts"
   ]
 }
