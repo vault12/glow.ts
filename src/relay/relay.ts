@@ -22,15 +22,16 @@ export class Relay {
   private publicKey?: Uint8Array;
   private clientToken?: Uint8Array;
   private sessionKeys?: Keys;
-  private tokenExpirationTimeoutHandle?: any;
-  private sessionExpirationTimeoutHandle?: any;
-  // Ensures that a call to the static getInstance() method is blocking
+  private tokenExpirationTimeoutHandle?: ReturnType<typeof setTimeout>;
+  private sessionExpirationTimeoutHandle?: ReturnType<typeof setTimeout>;
 
   constructor(public url: string) {
     this.nacl = NaCl.getInstance();
   }
 
   get isConnected() {
+    // relay is assumed to be connected when it got session keys and server public
+    // sessionKeys are not permanent so relay won't be connected when sessionKeys will be removed within timeout
     return !!(this.sessionKeys && this.publicKey);
   }
 
@@ -41,7 +42,6 @@ export class Relay {
    * Returns h₂(signature) and a relay public key
    */
   async openConnection(): Promise<RelayConnectionData> {
-    // reset token expiration flag, since we are reconnecting again
     this.sessionKeys = new Keys(await this.nacl.crypto_box_keypair());
     this.clientToken = await this.nacl.random_bytes(config.RELAY_TOKEN_LEN);
     const relayToken = await this.fetchRelayToken();
@@ -235,7 +235,7 @@ export class Relay {
   }
 
   /**
-   * Mark a relay instance as having an expired token, so reconnection is required
+   * delete token locally before it was removed on server so will reconnect without getting unauthorized error
    */
   private scheduleTokenExpiration() {
     if (this.tokenExpirationTimeoutHandle) {
@@ -253,6 +253,10 @@ export class Relay {
     }
   }
 
+  /**
+   * established session is valid only for some period need to remove it after it's ttl
+   * so relay will reconnect without receiving error from server
+   */
   private scheduleSessionExpiration() {
     if (this.sessionExpirationTimeoutHandle) {
       clearTimeout(this.sessionExpirationTimeoutHandle);

@@ -17,14 +17,6 @@ describe('Relay', () => {
     expect(connection.relayPublicKey).toHaveLength(32);
   });
 
-  it('should ever create only one instance for a given URL', async () => {
-    const relay1 = new Relay(testRelayURL);
-    const relay2 = new Relay(testRelayURL);
-    // attempt to run both constructors simultaneously
-    await Promise.all([relay1, relay2]);
-    expect(relay1).toEqual(relay2);
-  });
-
   it('should handle server errors', async () => {
     // This sets the mock adapter on the default Axios instance
     const mock = new MockAdapter(axios);

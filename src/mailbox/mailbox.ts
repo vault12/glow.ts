@@ -312,7 +312,7 @@ export class Mailbox {
    * Gets a singleton Relay instance, and reconnects to a relay if a previous token has expired
    */
   private async prepareRelay(url: string): Promise<Relay> {
-    const relay = await this.relayFactory.getInstance(url);
+    const relay = this.relayFactory.getInstance(url);
     /**
      * allow establishing only once connection for pair mailbox-relay
      */
