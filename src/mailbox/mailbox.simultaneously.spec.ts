@@ -34,8 +34,8 @@ describe('Mailbox simultaneously', () => {
         Alice.download(testRelayURL),
         Bob.download(testRelayURL)
       ]);
-      expect(aliceMsgs[0].data).toBe(msg2);
-      expect(bobMsgs.map(m => m.data)).toEqual([msg1, msg2]);
+      expect(aliceMsgs.map(m => m.data)).toEqual([msg2]);
+      expect(bobMsgs.map(m => m.data).sort()).toEqual([msg1, msg2].sort());
       await Promise.all([
         Alice.delete(testRelayURL, aliceMsgs.map(m => m.nonce)),
         Bob.delete(testRelayURL, bobMsgs.map(m => m.nonce))
@@ -63,7 +63,7 @@ describe('Mailbox simultaneously', () => {
         Bob.download(testRelayURL2),
       ]);
       expect(msgsRelay1.map(m => m.data)).toEqual([msg1]);
-      expect(msgsRelay2.map(m => m.data)).toEqual([msg1, msg2]);
+      expect(msgsRelay2.map(m => m.data).sort()).toEqual([msg1, msg2].sort());
       Bob.delete(testRelayURL, msgsRelay1.map(m => m.nonce));
       Bob.delete(testRelayURL2, msgsRelay2.map(m => m.nonce));
     });
