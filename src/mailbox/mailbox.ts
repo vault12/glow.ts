@@ -108,7 +108,7 @@ export class Mailbox {
    * or if it can't be decrypted because HPK is missing in the keyring.
    * Returns an array of mixed messages
    */
-  async download(url: string): Promise<ZaxParsedMessage[]> {
+  async download(url: string) {
     const relay = await this.prepareRelay(url);
     const response = await this.runRelayCommand(relay, RelayCommand.download);
     const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
@@ -133,17 +133,17 @@ export class Mailbox {
    * Marks a raw Zax message as one that can't be decrypted,
    * because sender's HPK is not found in the keyring
    */
-  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage): Promise<ZaxPlainMessage> {
-    return { data, time, from, nonce, kind: ZaxMessageKind.plain };
+  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage) {
+    return { data, time, from, nonce, kind: ZaxMessageKind.plain } as ZaxPlainMessage;
   }
 
   /**
    * Decrypts a message that represents uploaded file metadata
    */
-  private async parseFileMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxFileMessage> {
+  private async parseFileMessage(message: ZaxRawMessage, senderTag: string) {
     const { nonce, ctext, uploadID } = JSON.parse(message.data);
     const data: FileUploadMetadata = await this.decodeMessage(senderTag, nonce, ctext);
-    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file };
+    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
   }
 
   /**
