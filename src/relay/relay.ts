@@ -56,7 +56,9 @@ export class Relay {
    * Sends a client token to a relay and saves a relay token
    */
   private async fetchRelayToken(): Promise<Uint8Array> {
-    this.validateClientToken();
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
     const data = await this.httpCall('start_session', Utils.toBase64(this.clientToken));
     // Set a timer to mark a relay instance as having an expired token after a certain time
     this.scheduleTokenExpiration();
@@ -75,7 +77,9 @@ export class Relay {
    * Completes the handshake and saves a relay pubic key
    */
   private async fetchRelayPublicKey(relayToken: Uint8Array) {
-    this.validateClientToken();
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
     // After clientToken is sent to the relay, we use only h2() of it
     const h2ClientToken = Utils.toBase64(await this.nacl.h2(this.clientToken));
 
@@ -99,7 +103,9 @@ export class Relay {
    * Attaches a mailbox and fetches number of messages
    */
   async prove(payload: EncryptedMessage): Promise<string> {
-    this.validateClientToken();
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
     if (!this.sessionKeys) {
       throw new Error('[Relay] No session key found, open the connection first');
     }
@@ -166,7 +172,9 @@ export class Relay {
   }
 
   private async getSignature(relayToken: Uint8Array, sessionKeys: Keys) {
-    this.validateClientToken();
+    if (!this.clientToken) {
+      throw new Error('[Relay] clientToken is required please openConnection first');
+    }
     const clientTempPk = Utils.fromBase64(sessionKeys.publicKey);
     // Alice creates a 32 byte session signature as h₂(a_temp_pk, relayToken, clientToken)
     const signature = new Uint8Array([...clientTempPk, ...relayToken, ...this.clientToken]);
@@ -267,11 +275,6 @@ export class Relay {
     }
   }
 
-  private validateClientToken() {
-    if (!this.clientToken) {
-      throw new Error('[Relay] clientToken is required please openConnection first');
-    }
-  }
   // ---------- Difficulty adjustment ----------
 
   /**
