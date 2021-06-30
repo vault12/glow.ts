@@ -38,7 +38,7 @@ export class Mailbox {
 
   private relayFactory = new RelayFactory;
 
-  private relayConnectionMutex = new Map<string, Mutex>();
+  private relayConnectionMutexes = new Map<string, Mutex>();
 
   private nacl: NaClDriver;
 
@@ -391,9 +391,9 @@ export class Mailbox {
   }
 
   private getRelayConnectionMutex(url: string) {
-    if (!this.relayConnectionMutex.has(url)) {
-      this.relayConnectionMutex.set(url, new Mutex());
+    if (!this.relayConnectionMutexes.has(url)) {
+      this.relayConnectionMutexes.set(url, new Mutex());
     }
-    return this.relayConnectionMutex.get(url) as Mutex;
+    return this.relayConnectionMutexes.get(url) as Mutex;
   }
 }
