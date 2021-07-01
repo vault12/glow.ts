@@ -6,9 +6,12 @@ import { StorageDriver } from './crypto-storage/storage-driver.interface.js';
 import { LocalStorageDriver } from './crypto-storage/local-storage.driver.js';
 import { Mailbox } from './mailbox/mailbox';
 import { Relay } from './relay/relay';
-import { ZaxMessageKind, ZaxTextMessage, ZaxFileMessage, ZaxPlainMessage, ZaxParsedMessage } from './zax.interface';
+import {
+  ZaxMessageKind, ZaxTextMessage, ZaxFileMessage, ZaxPlainMessage, ZaxParsedMessage, FileStatusResponse
+} from './zax.interface';
 import { JsNaClDriver } from './nacl/js-nacl-driver';
 import { Utils } from './utils/utils';
+import { NaClDriver } from './nacl/nacl-driver.interface';
 
 export {
   NaCl,
@@ -24,6 +27,8 @@ export {
   ZaxFileMessage,
   ZaxPlainMessage,
   ZaxParsedMessage,
+  FileStatusResponse,
+  NaClDriver,
   JsNaClDriver,
   Utils
 };
