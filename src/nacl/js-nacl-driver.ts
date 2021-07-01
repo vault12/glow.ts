@@ -3,6 +3,7 @@ import { sha256 } from 'js-sha256';
 
 import { NaClDriver } from './nacl-driver.interface';
 import { Keypair } from './keypair.interface';
+import { Utils } from '../utils/utils';
 
 
 /**
@@ -77,21 +78,11 @@ export class JsNaClDriver implements NaClDriver {
   // https://github.com/tonyg/js-nacl/blob/cc70775cfc9d68a04905ca65c7f179b33a18066e/nacl_cooked.js
 
   async encode_latin1(data: string): Promise<Uint8Array> {
-    const result = new Uint8Array(data.length);
-    for (let i = 0; i < data.length; i++) {
-      const c = data.charCodeAt(i);
-      if ((c & 0xff) !== c) throw { message: 'Cannot encode string in Latin1', str: data };
-      result[i] = (c & 0xff);
-    }
-    return result;
+    return Utils.encode_latin1(data);
   }
 
   async decode_latin1(data: Uint8Array): Promise<string> {
-    const encoded = [];
-    for (let i = 0; i < data.length; i++) {
-      encoded.push(String.fromCharCode(data[i]));
-    }
-    return encoded.join('');
+    return Utils.decode_latin1(data);
   }
 
   async encode_utf8(data: string): Promise<Uint8Array> {
