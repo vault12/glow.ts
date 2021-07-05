@@ -61,15 +61,6 @@ describe('Mailbox / Messages', () => {
     expect(ttl).toBe(MessageStatusResponse.MissingKey); // the key is missing on the relay
   });
 
-  it('send unencrypted message', async () => {
-    const token = await Alice.upload(testRelayURL, 'Bob', 'some unencrypted message', false);
-    expect(token.length).toBeGreaterThan(0);
-    const count = await Bob.count(testRelayURL);
-    expect(count).toBe(1);
-    const [ message ] = await Bob.download(testRelayURL);
-    expect(message.data).toBe('some unencrypted message');
-  });
-
   it('should reconnect after token expiration timeout', async () => {
     // using 'modern' breaks the test in Jest 27+ environment
     // See https://jestjs.io/blog/2021/05/25/jest-27#flipping-defaults

@@ -66,7 +66,7 @@ describe('Mailbox / Offline tests', () => {
   });
 
   it('encrypts raw binary data', async () => {
-    const message = await Alice.encodeMessage('Bob_mbx', new Uint8Array([1, 2, 3, 4]));
+    const message = await Alice.encodeMessage('Bob_mbx', '1234');
     expect(message.nonce).toHaveLength(32);
     expect(message.ctext).toHaveLength(28);
   });

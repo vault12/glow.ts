@@ -92,7 +92,7 @@ export class Mailbox {
    * send a plaintext message. Returns a token that can be used with `messageStatus` command to check
    * the status of the message
    */
-  async upload(url: string, guestKey: string, message: any, encrypt = true): Promise<Base64> {
+  async upload(url: string, guestKey: string, message: string, encrypt = true): Promise<Base64> {
     const relay = await this.prepareRelay(url);
     const guestPk = this.getGuestKey(guestKey);
     const payload = encrypt ? await this.encodeMessage(guestKey, message) : message;
@@ -142,7 +142,11 @@ export class Mailbox {
    */
   private async parseFileMessage(message: ZaxRawMessage, senderTag: string) {
     const { nonce, ctext, uploadID } = JSON.parse(message.data);
-    const data: FileUploadMetadata = await this.decodeMessage(senderTag, nonce, ctext);
+    const rawData = await this.decodeMessage(senderTag, nonce, ctext);
+    if (rawData === null) {
+      throw new Error('[Mailbox] Failed to decode file message');
+    }
+    const data = JSON.parse(rawData) as FileUploadMetadata;
     return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
   }
 
@@ -204,7 +208,7 @@ export class Mailbox {
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
     rawMetadata.skey = Utils.toBase64(secretKey);
 
-    const metadata = await this.encodeMessage(guest, rawMetadata);
+    const metadata = await this.encodeMessage(guest, JSON.stringify(rawMetadata));
 
     const response = await this.runRelayCommand(relay, RelayCommand.startFileUpload, {
       to: toHpk,
@@ -295,11 +299,11 @@ export class Mailbox {
     const connectionData = await relay.openConnection();
     const encryptedSignature = await this.encryptSignature(connectionData);
 
-    const messagesNumber = await relay.prove(await relay.encodeMessage({
+    const messagesNumber = await relay.prove(await relay.encodeMessage(JSON.stringify({
       pub_key: this.keyRing.getPubCommKey(),
       nonce: encryptedSignature.nonce,
       ctext: encryptedSignature.ctext
-    }));
+    })));
     return parseInt(messagesNumber, 10);
   }
 
@@ -327,10 +331,11 @@ export class Mailbox {
   /**
    * Encrypts the payload of the command and sends it to a relay
    */
-  private async runRelayCommand(relay: Relay, command: RelayCommand, params?: any, ctext?: string): Promise<string[]> {
+  private async runRelayCommand(
+    relay: Relay, command: RelayCommand, params?: {[key:string]: any}, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.keyRing.getHpk();
-    const message = await relay.encodeMessage(params);
+    const message = await relay.encodeMessage(JSON.stringify(params));
     return await relay.runCmd(command, hpk, message, ctext);
   }
 
@@ -349,21 +354,30 @@ export class Mailbox {
    * Encodes a free-form object `message` to the guest key of a guest already
    * added to the keyring
    */
-  async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
+  async encodeMessage(guest: string, message: string): Promise<EncryptedMessage> {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    return await EncryptionHelper.encodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    return await EncryptionHelper.encodeMessage(
+      await this.nacl.encode_utf8(message), Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   /**
    * Decodes a ciphertext from a guest key already in our keyring with this nonce
+   * @returns null if failed to decode
    */
-  async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
+  async decodeMessage(guest: string, nonce: Base64, ctext: Base64) {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
+    let uint8ArrayCtext: Uint8Array;
+    try {
+      uint8ArrayCtext = Utils.fromBase64(ctext);
+    } catch (err) {
+      // looks like ctext was not encoded
+      return null;
+    }
 
-    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), uint8ArrayCtext,
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
