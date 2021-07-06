@@ -17,14 +17,14 @@ describe('Mailbox / Transfer Messages', () => {
   const encryptMessages = [true, false];
 
   beforeAll(() => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
   });
 
   encryptMessages.forEach(encrypt => {
     messages.forEach((msg) => {
       describe(`transfer message ${JSON.stringify(msg)} ${(encrypt ? 'with' : 'without')} encryption`, () => {
         beforeAll(async () => {
-          CryptoStorage.setStorageDriver();
+          CryptoStorage.setDefaultStorageDriver();
           Alice = await Mailbox.new('Alice');
           Bob = await Mailbox.new('Bob');
 
