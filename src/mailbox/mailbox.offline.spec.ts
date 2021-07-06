@@ -1,13 +1,15 @@
 import { Mailbox } from './mailbox';
 import { NaCl } from '../nacl/nacl';
 import { Utils } from '../utils/utils';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 
 describe('Mailbox / Offline tests', () => {
   let Alice: Mailbox;
   let Bob: Mailbox;
 
   beforeAll(async () => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
   });

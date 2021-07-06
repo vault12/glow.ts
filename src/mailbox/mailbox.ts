@@ -19,6 +19,9 @@ import {
   ZaxTextMessage,
   ZaxParsedMessage
 } from '../zax.interface';
+import { RelayFactory } from '../relay/relay-factory';
+import { Mutex } from 'async-mutex';
+
 
 /**
  * Mailbox class represents a wrapper around a Keyring that allows to exchange
@@ -27,6 +30,15 @@ import {
 export class Mailbox {
   public keyRing: KeyRing;
   public identity: string;
+  /**
+   * each mailbox use it's own relays for connection
+   * this gives possibility to connect different mailboxes to same server simultaneously
+   * because they will use different session keys, tokens, server pub keys
+   */
+
+  private relayFactory = new RelayFactory;
+
+  private relayConnectionMutexes = new Map<string, Mutex>();
 
   private nacl: NaClDriver;
 
@@ -96,7 +108,7 @@ export class Mailbox {
    * or if it can't be decrypted because HPK is missing in the keyring.
    * Returns an array of mixed messages
    */
-  async download(url: string): Promise<ZaxParsedMessage[]> {
+  async download(url: string) {
     const relay = await this.prepareRelay(url);
     const response = await this.runRelayCommand(relay, RelayCommand.download);
     const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
@@ -121,17 +133,17 @@ export class Mailbox {
    * Marks a raw Zax message as one that can't be decrypted,
    * because sender's HPK is not found in the keyring
    */
-  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage): Promise<ZaxPlainMessage> {
-    return { data, time, from, nonce, kind: ZaxMessageKind.plain };
+  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage) {
+    return { data, time, from, nonce, kind: ZaxMessageKind.plain } as ZaxPlainMessage;
   }
 
   /**
    * Decrypts a message that represents uploaded file metadata
    */
-  private async parseFileMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxFileMessage> {
+  private async parseFileMessage(message: ZaxRawMessage, senderTag: string) {
     const { nonce, ctext, uploadID } = JSON.parse(message.data);
     const data: FileUploadMetadata = await this.decodeMessage(senderTag, nonce, ctext);
-    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file };
+    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
   }
 
   /**
@@ -279,7 +291,7 @@ export class Mailbox {
    * communications with any relay. Returns the number of messages in the mailbox
    */
   async connectToRelay(url: string): Promise<number> {
-    const relay = await Relay.getInstance(url);
+    const relay = this.relayFactory.getInstance(url);
     const connectionData = await relay.openConnection();
     const encryptedSignature = await this.encryptSignature(connectionData);
 
@@ -300,10 +312,15 @@ export class Mailbox {
    * Gets a singleton Relay instance, and reconnects to a relay if a previous token has expired
    */
   private async prepareRelay(url: string): Promise<Relay> {
-    const relay = await Relay.getInstance(url);
-    if (relay.isTokenExpired) {
-      await this.connectToRelay(url);
-    }
+    const relay = this.relayFactory.getInstance(url);
+    /**
+     * allow establishing only once connection for pair mailbox-relay
+     */
+    await this.getRelayConnectionMutex(url).runExclusive(async () => {
+      if (!relay.isConnected) {
+        await this.connectToRelay(url);
+      }
+    });
     return relay;
   }
 
@@ -371,5 +388,12 @@ export class Mailbox {
    */
   async selfDestruct() {
     await this.keyRing.selfDestruct();
+  }
+
+  private getRelayConnectionMutex(url: string) {
+    if (!this.relayConnectionMutexes.has(url)) {
+      this.relayConnectionMutexes.set(url, new Mutex());
+    }
+    return this.relayConnectionMutexes.get(url) as Mutex;
   }
 }

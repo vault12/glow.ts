@@ -2,6 +2,7 @@ import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { randomNumber, testRelayURL } from '../tests.helper';
 import { FileUploadMetadata } from '../zax.interface';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 
 describe('Mailbox / File transfer', () => {
 
@@ -18,7 +19,8 @@ describe('Mailbox / File transfer', () => {
   let metadata: FileUploadMetadata;
 
   beforeAll(async () => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
 
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
@@ -26,8 +28,6 @@ describe('Mailbox / File transfer', () => {
     const bobKey = Bob.keyRing.getPubCommKey();
     await Alice.keyRing.addGuest('Bob', bobKey);
     await Bob.keyRing.addGuest('Alice', aliceKey);
-
-    await Alice.connectToRelay(testRelayURL);
 
     // Generate a random binary file
     file = new Uint8Array(randomNumber(500, 1000)).map(() => randomNumber(0, 255));
@@ -74,7 +74,6 @@ describe('Mailbox / File transfer', () => {
     expect(statusAlice.total_chunks).toBe(numberOfChunks);
     expect(statusAlice.bytes_stored).toBeGreaterThan(file.length);
 
-    await Bob.connectToRelay(testRelayURL);
     const statusBob = await Bob.getFileStatus(testRelayURL, uploadID);
     expect(statusBob.status).toBe('COMPLETE');
     expect(statusAlice.file_size).toBe(file.length);

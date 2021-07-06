@@ -6,7 +6,7 @@ describe('NaCl', () => {
   let nacl: NaClDriver;
 
   beforeAll(() => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
     nacl = NaCl.getInstance();
   });
 
