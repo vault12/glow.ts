@@ -8,8 +8,8 @@ describe('Mailbox / Offline tests', () => {
   let Bob: Mailbox;
 
   beforeAll(async () => {
-    NaCl.setInstance();
-    CryptoStorage.setStorageDriver();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
   });

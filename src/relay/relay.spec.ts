@@ -7,7 +7,7 @@ import { testRelayURL } from '../tests.helper';
 
 describe('Relay', () => {
   beforeAll(async () => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
   });
 
   it('should initialize', async () => {

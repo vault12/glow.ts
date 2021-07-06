@@ -5,8 +5,8 @@ describe('CryptoStorage', () => {
   let storage: CryptoStorage;
 
   beforeAll(async () => {
-    NaCl.setInstance();
-    CryptoStorage.setStorageDriver();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
     storage = await CryptoStorage.new('test');
   });
 

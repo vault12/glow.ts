@@ -9,8 +9,8 @@ describe('Keyring', () => {
   let nacl: NaClDriver;
 
   beforeAll(() => {
-    NaCl.setInstance();
-    CryptoStorage.setStorageDriver();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
     nacl = NaCl.getInstance();
   });
 

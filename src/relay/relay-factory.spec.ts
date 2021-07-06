@@ -5,7 +5,7 @@ import { RelayFactory } from './relay-factory';
 describe('RelayFactory', () => {
 
   beforeAll(() => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
   });
 
   it('should ever create only one instance for same URLs', async () => {
