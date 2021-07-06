@@ -351,7 +351,7 @@ export class Mailbox {
   // ---------- Message encoding / decoding ----------
 
   /**
-   * Encodes a free-form object `message` to the guest key of a guest already
+   * Encodes `message` to the guest key of a guest already
    * added to the keyring
    */
   async encodeMessage(guest: string, message: string): Promise<EncryptedMessage> {

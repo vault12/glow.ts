@@ -16,7 +16,7 @@ export class NaCl {
 
   public static setInstance(driver: NaClDriver): boolean {
     if (this.driverInstance) {
-      console.warn('[NaCl] NaCl driver has been already set, it is supposed to be set only once');
+      throw new Error('[NaCl] NaCl driver has been already set, it is supposed to be set only once');
     }
     this.driverInstance = driver;
 

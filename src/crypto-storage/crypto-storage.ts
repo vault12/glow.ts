@@ -55,7 +55,7 @@ export class CryptoStorage {
 
   static setStorageDriver(driver: StorageDriver) {
     if (this.storageDriver) {
-      console.warn('[CryptoStorage] StorageDriver has been already set, it is supposed to be set only once');
+      throw new Error('[CryptoStorage] StorageDriver has been already set, it is supposed to be set only once');
     }
     this.storageDriver = driver;
     return true;

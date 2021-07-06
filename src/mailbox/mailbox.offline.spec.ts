@@ -65,7 +65,7 @@ describe('Mailbox / Offline tests', () => {
     expect(decoded2).toEqual(utfSource2);
   });
 
-  it('encrypts raw binary data', async () => {
+  it('produces proper encrypted messages after encryption', async () => {
     const message = await Alice.encodeMessage('Bob_mbx', '1234');
     expect(message.nonce).toHaveLength(32);
     expect(message.ctext).toHaveLength(28);

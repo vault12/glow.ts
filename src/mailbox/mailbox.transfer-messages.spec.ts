@@ -1,4 +1,5 @@
 import { CryptoStorage } from '../crypto-storage/crypto-storage';
+import { InMemoryStorage } from '../crypto-storage/in-memory-storage';
 import { NaCl } from '../nacl/nacl';
 import { testRelayURL } from '../tests.helper';
 import { Mailbox } from './mailbox';
@@ -13,18 +14,20 @@ describe('Mailbox / Transfer Messages', () => {
     'some unencrypted message',
     'special ;@@#2sd characters',
     'кирилиця'
-  ].slice(0,4);
+  ];
   const encryptMessages = [true, false];
+  const storage = new InMemoryStorage();
 
   beforeAll(() => {
     NaCl.setDefaultInstance();
+    CryptoStorage.setStorageDriver(storage);
   });
 
   encryptMessages.forEach(encrypt => {
     messages.forEach((msg) => {
       describe(`transfer message ${JSON.stringify(msg)} ${(encrypt ? 'with' : 'without')} encryption`, () => {
         beforeAll(async () => {
-          CryptoStorage.setDefaultStorageDriver();
+          storage.reset();
           Alice = await Mailbox.new('Alice');
           Bob = await Mailbox.new('Bob');
 
