@@ -49,7 +49,11 @@ export class CryptoStorage {
     }
   }
 
-  static setStorageDriver(driver: StorageDriver = new LocalStorageDriver()) {
+  static setDefaultStorageDriver() {
+    return this.setStorageDriver(new LocalStorageDriver());
+  }
+
+  static setStorageDriver(driver: StorageDriver) {
     if (this.storageDriver) {
       throw new Error('[NaCl] NaCl driver has been already set, it is supposed to be set only once');
     } else {

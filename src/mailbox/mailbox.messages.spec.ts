@@ -12,8 +12,8 @@ describe('Mailbox / Messages', () => {
   let token: string;
 
   beforeAll(() => {
-    NaCl.setInstance();
-    CryptoStorage.setStorageDriver();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
   });
 
   beforeEach(async () => {

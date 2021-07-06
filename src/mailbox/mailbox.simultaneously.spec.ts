@@ -10,8 +10,8 @@ describe('Mailbox simultaneously', () => {
   const msg2 = 'hi there';
 
   beforeAll(async () => {
-    NaCl.setInstance();
-    CryptoStorage.setStorageDriver();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
 
   });
 

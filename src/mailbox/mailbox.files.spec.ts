@@ -19,8 +19,8 @@ describe('Mailbox / File transfer', () => {
   let metadata: FileUploadMetadata;
 
   beforeAll(async () => {
-    NaCl.setInstance();
-    CryptoStorage.setStorageDriver();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
 
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
