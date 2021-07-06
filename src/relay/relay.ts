@@ -116,7 +116,7 @@ export class Relay {
     return result;
   }
 
-  async encodeMessage(message: any): Promise<EncryptedMessage> {
+  async encodeMessage(message: string): Promise<EncryptedMessage> {
     if (!this.publicKey) {
       throw new Error('[Relay] No relay public key found, open the connection first');
     }
@@ -125,7 +125,7 @@ export class Relay {
     }
 
     return await EncryptionHelper.encodeMessage(
-      message, this.publicKey, Utils.fromBase64(this.sessionKeys?.privateKey));
+      await this.nacl.encode_utf8(message), this.publicKey, Utils.fromBase64(this.sessionKeys?.privateKey));
   }
 
   async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
@@ -137,8 +137,12 @@ export class Relay {
       throw new Error('[Relay] No session key found, open the connection first');
     }
 
-    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
+    const decodedData = await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext), relayPk,
       Utils.fromBase64(this.sessionKeys.privateKey));
+    if (decodedData === null) {
+      throw new Error('[Relay] failed to decode message');
+    }
+    return JSON.parse(decodedData);
   }
 
   // ---------- Low-level server request handling ----------

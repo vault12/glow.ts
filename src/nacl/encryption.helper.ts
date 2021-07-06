@@ -13,31 +13,26 @@ export class EncryptionHelper {
   /**
    * Encodes a binary message with `cryptobox`
    */
-  static async encodeMessage(message: any, pkTo: Uint8Array, skFrom: Uint8Array, nonceData?: number):
-    Promise<EncryptedMessage> {
+  static async encodeMessage(message: Uint8Array, pkTo: Uint8Array, skFrom: Uint8Array, nonceData?: number) {
     const nacl = NaCl.getInstance();
-
-    if (!(message instanceof Uint8Array)) {
-      message = await nacl.encode_utf8(JSON.stringify(message));
-    }
 
     const nonce = await this.makeNonce(nonceData);
     const ctext = await nacl.crypto_box(message, nonce, pkTo, skFrom);
     return {
       nonce: Utils.toBase64(nonce),
       ctext: Utils.toBase64(ctext)
-    };
+    } as EncryptedMessage;
   }
 
   /**
    * Decodes a binary message with `cryptobox_open`
+   * @returns null if failed to decode
    */
-  static async decodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array): Promise<any> {
+  static async decodeMessage(nonce: Uint8Array, ctext: Uint8Array, pkFrom: Uint8Array, skTo: Uint8Array) {
     const nacl = NaCl.getInstance();
     const data = await nacl.crypto_box_open(ctext, nonce, pkFrom, skTo);
     if (data) {
-      const utf8 = await nacl.decode_utf8(data);
-      return JSON.parse(utf8);
+      return await nacl.decode_utf8(data);
     }
 
     return data;

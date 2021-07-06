@@ -59,7 +59,7 @@ export interface ZaxTextMessage {
   /**
    * Decoded object after JSON.parse
    */
-  data: any;
+  data: string;
   time: number;
   senderTag: string;
   nonce: Base64;
@@ -80,6 +80,7 @@ export interface ZaxPlainMessage {
   time: number;
   from: Base64;
   nonce: Base64;
+  senderTag: undefined;
   kind: ZaxMessageKind.plain;
 }
 
