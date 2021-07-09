@@ -3,7 +3,7 @@ const sessionTimeoutBuffer = 30 * 1000;
 export const config = {
   NONCE_TAG: '__nc',
   SKEY_TAG: 'storage_key',
-  STORAGE_ROOT: '.v2.stor.vlt12',
+  STORAGE_ROOT: '.v1.stor.vlt12',
   // Relay tokens, keys and hashes are 32 bytes
   RELAY_TOKEN_LEN: 32,
   // 5 min - Token expiration on the server side, matched with config.x.relay.token_timeout on Zax server
