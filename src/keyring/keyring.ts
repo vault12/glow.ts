@@ -149,18 +149,18 @@ export class KeyRing {
   }
 
   private async loadGuestKeys() {
-    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
+    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag) as {[key:string]: any};
     if (!guestKeys) {
       return;
-    } else if (Array.isArray(guestKeys)) {
-      this.guestKeys = new Map(guestKeys);
+    } else if (typeof guestKeys === 'object') {
+      this.guestKeys = new Map(Object.entries(guestKeys));
     } else {
-      throw new Error('[Keyring] Guest keys is not an array');
+      throw new Error('[Keyring] Guest keys is not an object');
     }
   }
 
   private async saveGuests() {
-    await this.storage.save(KeyRing.guestRegistryTag, Array.from(this.guestKeys.entries()));
+    await this.storage.save(KeyRing.guestRegistryTag, Object.fromEntries(this.guestKeys.entries()));
   }
 
   private static async getCommKey(nacl: NaClDriver, storage: CryptoStorage): Promise<Keys> {

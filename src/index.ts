@@ -12,6 +12,7 @@ import {
 import { JsNaClDriver } from './nacl/js-nacl-driver';
 import { Utils } from './utils/utils';
 import { NaClDriver } from './nacl/nacl-driver.interface';
+import { InMemoryStorage } from './crypto-storage/in-memory-storage';
 
 export {
   NaCl,
@@ -30,5 +31,6 @@ export {
   FileStatusResponse,
   NaClDriver,
   JsNaClDriver,
-  Utils
+  Utils,
+  InMemoryStorage
 };
