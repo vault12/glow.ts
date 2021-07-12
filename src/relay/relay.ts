@@ -253,7 +253,7 @@ export class Relay {
     this.tokenExpirationTimeoutHandle = setTimeout(() => this.clearToken(), config.RELAY_TOKEN_TIMEOUT);
   }
 
-  private clearToken() {
+  clearToken() {
     if (this.tokenExpirationTimeoutHandle) {
       clearTimeout(this.tokenExpirationTimeoutHandle);
     }
@@ -275,7 +275,7 @@ export class Relay {
     }, config.RELAY_SESSION_TIMEOUT);
   }
 
-  private clearSession() {
+  clearSession() {
     if (this.sessionExpirationTimeoutHandle) {
       clearTimeout(this.sessionExpirationTimeoutHandle);
     }

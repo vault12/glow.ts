@@ -307,6 +307,12 @@ export class Mailbox {
     return parseInt(messagesNumber, 10);
   }
 
+  clearSession(url: string) {
+    const relay = this.relayFactory.getInstance(url);
+    relay.clearToken();
+    relay.clearSession();
+  }
+
   private async encryptSignature(connection: RelayConnectionData) {
     const privateKey = Utils.fromBase64(this.keyRing.getPrivateCommKey());
     return await EncryptionHelper.encodeMessage(connection.h2Signature, connection.relayPublicKey, privateKey);
