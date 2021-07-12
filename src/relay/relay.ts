@@ -7,6 +7,7 @@ import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 import { RelayCommand } from '../zax.interface';
+import { CommandError } from './command-error';
 
 export interface RelayConnectionData {
   h2Signature: Uint8Array;
@@ -165,10 +166,14 @@ export class Relay {
     try {
       response = await this.httpCall('command', ...payload);
     } catch (err: any) {
-      if ((err as AxiosError).isAxiosError &&  (err as AxiosError<any>).response?.status === 401) {
-        // clear session if unauthorized
-        this.clearSession();
-        this.clearToken();
+      if ((err as AxiosError).isAxiosError) {
+        const error = err as AxiosError;
+        if (error.response?.status === 401) {
+          // clear session if unauthorized
+          this.clearSession();
+          this.clearToken();
+        }
+        throw new CommandError(error.response?.status);
       }
       throw err;
     }
