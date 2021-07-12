@@ -12,7 +12,7 @@ import {
 import { JsNaClDriver } from './nacl/js-nacl-driver';
 import { Utils } from './utils/utils';
 import { NaClDriver } from './nacl/nacl-driver.interface';
-import { CommandError } from './relay/command-error';
+import { NetworkError } from './relay/network-error';
 import { InMemoryStorage } from './crypto-storage/in-memory-storage';
 
 export {
@@ -33,6 +33,6 @@ export {
   NaClDriver,
   JsNaClDriver,
   Utils,
-  CommandError,
+  NetworkError as CommandError,
   InMemoryStorage
 };

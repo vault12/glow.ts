@@ -7,7 +7,7 @@ import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 import { RelayCommand } from '../zax.interface';
-import { CommandError } from './command-error';
+import { NetworkError } from './network-error';
 
 export interface RelayConnectionData {
   h2Signature: Uint8Array;
@@ -173,7 +173,7 @@ export class Relay {
           this.clearSession();
           this.clearToken();
         }
-        throw new CommandError(error.response?.status);
+        throw new NetworkError(error.response?.status);
       }
       throw err;
     }
