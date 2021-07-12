@@ -33,6 +33,6 @@ export {
   NaClDriver,
   JsNaClDriver,
   Utils,
-  NetworkError as CommandError,
+  NetworkError,
   InMemoryStorage
 };
