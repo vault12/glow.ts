@@ -160,7 +160,7 @@ export class KeyRing {
   }
 
   private async saveGuests() {
-    await this.storage.save(KeyRing.guestRegistryTag, Object.fromEntries(this.guestKeys.entries()));
+    await this.storage.save(KeyRing.guestRegistryTag, Utils.toObject(this.guestKeys.entries()));
   }
 
   private static async getCommKey(nacl: NaClDriver, storage: CryptoStorage): Promise<Keys> {

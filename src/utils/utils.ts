@@ -32,4 +32,11 @@ export class Utils {
     }
     return encoded.join('');
   }
+
+  static toObject(pairs: IterableIterator<[string, any]>) {
+    return Array.from(pairs).reduce(
+      (acc, [key, value]) => Object.assign(acc, { [key]: value }),
+      {},
+    );
+  }
 }
