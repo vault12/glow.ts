@@ -162,21 +162,7 @@ export class Relay {
       payload.push(ctext);
     }
 
-    let response: string;
-    try {
-      response = await this.httpCall('command', ...payload);
-    } catch (err: any) {
-      if ((err as AxiosError).isAxiosError) {
-        const error = err as AxiosError;
-        if (error.response?.status === 401) {
-          // clear session if unauthorized
-          this.clearSession();
-          this.clearToken();
-        }
-        throw new NetworkError(error.response?.status);
-      }
-      throw err;
-    }
+    const response = await this.httpCall('command', ...payload);
     return this.parseResponse(command, response);
   }
 
@@ -209,7 +195,22 @@ export class Relay {
 
     // NOTE: Network and server errors are not handled ny Glow itself.
     // They should instead be handled where the library is used
-    const response = await axios(requestPayload);
+    let response: any;
+    try{
+      response = await axios(requestPayload);
+    } catch (err: any) {
+      if ((err as AxiosError).isAxiosError) {
+        const error = err as AxiosError;
+        if (error.response?.status === 401) {
+          // clear session if unauthorized
+          this.clearSession();
+          this.clearToken();
+        }
+        // when no network connection axios response is undefined
+        throw new NetworkError(error.response?.status || 0);
+      }
+      throw err;
+    }
     return String(response.data);
   }
 
