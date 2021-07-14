@@ -3,10 +3,10 @@
   "compilerOptions": {
     "moduleResolution": "node",
     "module": "es2020",
-    "target": "es2020",
+    "target": "es2017",
     "lib": [
       "dom",
-      "es2020"
+      "es2017"
     ],
     "strict": true,
     "esModuleInterop": true,
