@@ -19,6 +19,9 @@ import {
   ZaxTextMessage,
   ZaxParsedMessage
 } from '../zax.interface';
+import { RelayFactory } from '../relay/relay-factory';
+import { Mutex } from 'async-mutex';
+
 
 /**
  * Mailbox class represents a wrapper around a Keyring that allows to exchange
@@ -27,6 +30,15 @@ import {
 export class Mailbox {
   public keyRing: KeyRing;
   public identity: string;
+  /**
+   * each mailbox use it's own relays for connection
+   * this gives possibility to connect different mailboxes to same server simultaneously
+   * because they will use different session keys, tokens, server pub keys
+   */
+
+  private relayFactory = new RelayFactory;
+
+  private relayConnectionMutexes = new Map<string, Mutex>();
 
   private nacl: NaClDriver;
 
@@ -80,7 +92,7 @@ export class Mailbox {
    * send a plaintext message. Returns a token that can be used with `messageStatus` command to check
    * the status of the message
    */
-  async upload(url: string, guestKey: string, message: any, encrypt = true): Promise<Base64> {
+  async upload(url: string, guestKey: string, message: string, encrypt = true): Promise<Base64> {
     const relay = await this.prepareRelay(url);
     const guestPk = this.getGuestKey(guestKey);
     const payload = encrypt ? await this.encodeMessage(guestKey, message) : message;
@@ -96,7 +108,7 @@ export class Mailbox {
    * or if it can't be decrypted because HPK is missing in the keyring.
    * Returns an array of mixed messages
    */
-  async download(url: string): Promise<ZaxParsedMessage[]> {
+  async download(url: string) {
     const relay = await this.prepareRelay(url);
     const response = await this.runRelayCommand(relay, RelayCommand.download);
     const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
@@ -121,17 +133,21 @@ export class Mailbox {
    * Marks a raw Zax message as one that can't be decrypted,
    * because sender's HPK is not found in the keyring
    */
-  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage): Promise<ZaxPlainMessage> {
-    return { data, time, from, nonce, kind: ZaxMessageKind.plain };
+  private async parsePlainMessage({ data, time, from, nonce }: ZaxRawMessage) {
+    return { data, time, from, nonce, kind: ZaxMessageKind.plain } as ZaxPlainMessage;
   }
 
   /**
    * Decrypts a message that represents uploaded file metadata
    */
-  private async parseFileMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxFileMessage> {
+  private async parseFileMessage(message: ZaxRawMessage, senderTag: string) {
     const { nonce, ctext, uploadID } = JSON.parse(message.data);
-    const data: FileUploadMetadata = await this.decodeMessage(senderTag, nonce, ctext);
-    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file };
+    const rawData = await this.decodeMessage(senderTag, nonce, ctext);
+    if (rawData === null) {
+      throw new Error('[Mailbox] Failed to decode file message');
+    }
+    const data = JSON.parse(rawData) as FileUploadMetadata;
+    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
   }
 
   /**
@@ -192,7 +208,7 @@ export class Mailbox {
     const secretKey = await this.nacl.random_bytes(this.nacl.crypto_secretbox_KEYBYTES);
     rawMetadata.skey = Utils.toBase64(secretKey);
 
-    const metadata = await this.encodeMessage(guest, rawMetadata);
+    const metadata = await this.encodeMessage(guest, JSON.stringify(rawMetadata));
 
     const response = await this.runRelayCommand(relay, RelayCommand.startFileUpload, {
       to: toHpk,
@@ -279,16 +295,22 @@ export class Mailbox {
    * communications with any relay. Returns the number of messages in the mailbox
    */
   async connectToRelay(url: string): Promise<number> {
-    const relay = await Relay.getInstance(url);
+    const relay = this.relayFactory.getInstance(url);
     const connectionData = await relay.openConnection();
     const encryptedSignature = await this.encryptSignature(connectionData);
 
-    const messagesNumber = await relay.prove(await relay.encodeMessage({
+    const messagesNumber = await relay.prove(await relay.encodeMessage(JSON.stringify({
       pub_key: this.keyRing.getPubCommKey(),
       nonce: encryptedSignature.nonce,
       ctext: encryptedSignature.ctext
-    }));
+    })));
     return parseInt(messagesNumber, 10);
+  }
+
+  clearSession(url: string) {
+    const relay = this.relayFactory.getInstance(url);
+    relay.clearToken();
+    relay.clearSession();
   }
 
   private async encryptSignature(connection: RelayConnectionData) {
@@ -300,20 +322,26 @@ export class Mailbox {
    * Gets a singleton Relay instance, and reconnects to a relay if a previous token has expired
    */
   private async prepareRelay(url: string): Promise<Relay> {
-    const relay = await Relay.getInstance(url);
-    if (relay.isTokenExpired) {
-      await this.connectToRelay(url);
-    }
+    const relay = this.relayFactory.getInstance(url);
+    /**
+     * allow establishing only once connection for pair mailbox-relay
+     */
+    await this.getRelayConnectionMutex(url).runExclusive(async () => {
+      if (!relay.isConnected) {
+        await this.connectToRelay(url);
+      }
+    });
     return relay;
   }
 
   /**
    * Encrypts the payload of the command and sends it to a relay
    */
-  private async runRelayCommand(relay: Relay, command: RelayCommand, params?: any, ctext?: string): Promise<string[]> {
+  private async runRelayCommand(
+    relay: Relay, command: RelayCommand, params?: {[key:string]: any}, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.keyRing.getHpk();
-    const message = await relay.encodeMessage(params);
+    const message = await relay.encodeMessage(JSON.stringify(params));
     return await relay.runCmd(command, hpk, message, ctext);
   }
 
@@ -329,24 +357,33 @@ export class Mailbox {
   // ---------- Message encoding / decoding ----------
 
   /**
-   * Encodes a free-form object `message` to the guest key of a guest already
+   * Encodes `message` to the guest key of a guest already
    * added to the keyring
    */
-  async encodeMessage(guest: string, message: any): Promise<EncryptedMessage> {
+  async encodeMessage(guest: string, message: string): Promise<EncryptedMessage> {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
 
-    return await EncryptionHelper.encodeMessage(message, Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    return await EncryptionHelper.encodeMessage(
+      await this.nacl.encode_utf8(message), Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
   /**
    * Decodes a ciphertext from a guest key already in our keyring with this nonce
+   * @returns null if failed to decode
    */
-  async decodeMessage(guest: string, nonce: Base64, ctext: Base64): Promise<any> {
+  async decodeMessage(guest: string, nonce: Base64, ctext: Base64) {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
+    let uint8ArrayCtext: Uint8Array;
+    try {
+      uint8ArrayCtext = Utils.fromBase64(ctext);
+    } catch (err) {
+      // looks like ctext was not encoded
+      return null;
+    }
 
-    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), Utils.fromBase64(ctext),
+    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), uint8ArrayCtext,
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
@@ -371,5 +408,12 @@ export class Mailbox {
    */
   async selfDestruct() {
     await this.keyRing.selfDestruct();
+  }
+
+  private getRelayConnectionMutex(url: string) {
+    if (!this.relayConnectionMutexes.has(url)) {
+      this.relayConnectionMutexes.set(url, new Mutex());
+    }
+    return this.relayConnectionMutexes.get(url) as Mutex;
   }
 }

@@ -1,6 +1,4 @@
 import { CryptoStorage } from '../crypto-storage/crypto-storage';
-import { StorageDriver } from '../crypto-storage/storage-driver.interface';
-import { LocalStorageDriver } from '../crypto-storage/local-storage.driver';
 import { Keys } from '../keys/keys';
 import { NaCl } from '../nacl/nacl';
 import { Utils, Base64 } from '../utils/utils';
@@ -34,9 +32,9 @@ export class KeyRing {
     this.commKey = commKey;
   }
 
-  static async new(id: string, storageDriver?: StorageDriver): Promise<KeyRing> {
+  static async new(id: string): Promise<KeyRing> {
     const nacl = NaCl.getInstance();
-    const cryptoStorage = await CryptoStorage.new(storageDriver || new LocalStorageDriver(), id);
+    const cryptoStorage = await CryptoStorage.new(id);
     const commKey = await KeyRing.getCommKey(nacl, cryptoStorage);
     const keyRing = new KeyRing(nacl, cryptoStorage, commKey);
 
@@ -45,10 +43,10 @@ export class KeyRing {
     return keyRing;
   }
 
-  static async fromBackup(id: string, backupString: string, storageDriver?: StorageDriver): Promise<KeyRing> {
+  static async fromBackup(id: string, backupString: string): Promise<KeyRing> {
     const backup: KeyRingBackup = JSON.parse(backupString);
     const secretKey = Utils.fromBase64(backup[commKeyTag]);
-    const restoredKeyRing = await KeyRing.new(id, storageDriver);
+    const restoredKeyRing = await KeyRing.new(id);
     await restoredKeyRing.setCommFromSecKey(secretKey);
     for (const [key, value] of Object.entries(backup)) {
       if (key !== commKeyTag) {
@@ -151,18 +149,18 @@ export class KeyRing {
   }
 
   private async loadGuestKeys() {
-    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag);
+    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag) as {[key:string]: any};
     if (!guestKeys) {
       return;
-    } else if (Array.isArray(guestKeys)) {
-      this.guestKeys = new Map(guestKeys);
+    } else if (typeof guestKeys === 'object') {
+      this.guestKeys = new Map(Object.entries(guestKeys));
     } else {
-      throw new Error('[Keyring] Guest keys is not an array');
+      throw new Error('[Keyring] Guest keys is not an object');
     }
   }
 
   private async saveGuests() {
-    await this.storage.save(KeyRing.guestRegistryTag, Array.from(this.guestKeys.entries()));
+    await this.storage.save(KeyRing.guestRegistryTag, Utils.toObject(this.guestKeys.entries()));
   }
 
   private static async getCommKey(nacl: NaClDriver, storage: CryptoStorage): Promise<Keys> {

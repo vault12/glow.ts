@@ -2,8 +2,8 @@ import { NaCl } from '../nacl/nacl';
 import { Mailbox } from './mailbox';
 import { testRelayURL } from '../tests.helper';
 import { MessageStatusResponse } from '../zax.interface';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 import { config } from '../config';
-import { Relay } from '../relay/relay';
 
 describe('Mailbox / Messages', () => {
   let Alice: Mailbox;
@@ -11,9 +11,12 @@ describe('Mailbox / Messages', () => {
   let nonce: string;
   let token: string;
 
-  beforeAll(async () => {
-    NaCl.setInstance();
+  beforeAll(() => {
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
+  });
 
+  beforeEach(async () => {
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
 
@@ -22,7 +25,6 @@ describe('Mailbox / Messages', () => {
   });
 
   it('send a message', async () => {
-    await Alice.connectToRelay(testRelayURL);
     const wrongRecipient = Alice.upload(testRelayURL, 'Carl', 'some message');
     expect(wrongRecipient).rejects.toThrow(Error);
 
@@ -33,7 +35,6 @@ describe('Mailbox / Messages', () => {
   });
 
   it('count Bob mailbox', async () => {
-    await Bob.connectToRelay(testRelayURL);
     const count = await Bob.count(testRelayURL);
     expect(count).toBe(1);
   });
@@ -56,19 +57,8 @@ describe('Mailbox / Messages', () => {
   });
 
   it('check deleted message status', async () => {
-    await Alice.connectToRelay(testRelayURL);
     const ttl = await Alice.messageStatus(testRelayURL, token);
     expect(ttl).toBe(MessageStatusResponse.MissingKey); // the key is missing on the relay
-  });
-
-  it('send unencrypted message', async () => {
-    const token = await Alice.upload(testRelayURL, 'Bob', 'some unencrypted message', false);
-    expect(token.length).toBeGreaterThan(0);
-    await Bob.connectToRelay(testRelayURL);
-    const count = await Bob.count(testRelayURL);
-    expect(count).toBe(1);
-    const [ message ] = await Bob.download(testRelayURL);
-    expect(message.data).toBe('some unencrypted message');
   });
 
   it('should reconnect after token expiration timeout', async () => {
@@ -77,18 +67,15 @@ describe('Mailbox / Messages', () => {
     // TODO: fix this
     jest.useFakeTimers('legacy');
     await Bob.connectToRelay(testRelayURL);
-    const relay = await Relay.getInstance(testRelayURL);
     const connectSpy = jest.spyOn(Bob, 'connectToRelay');
 
     // fast-forward to where the token is not yet expired
-    jest.advanceTimersByTime(config.RELAY_TOKEN_TIMEOUT - 1);
-    expect(relay.isTokenExpired).toBe(false);
+    jest.advanceTimersByTime(config.RELAY_SESSION_TIMEOUT - 1);
     await Bob.download(testRelayURL);
     expect(connectSpy).not.toHaveBeenCalled();
 
     // has to reconnect under the hood when a token expires
     jest.advanceTimersByTime(2);
-    expect(relay.isTokenExpired).toBe(true);
     await Bob.download(testRelayURL);
     expect(connectSpy).toHaveBeenCalledTimes(1);
 

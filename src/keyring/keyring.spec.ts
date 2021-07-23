@@ -3,12 +3,14 @@ import { NaCl } from '../nacl/nacl';
 import { NaClDriver } from '../nacl/nacl-driver.interface';
 import { Keys } from '../keys/keys';
 import { Utils } from '../utils/utils';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 
 describe('Keyring', () => {
   let nacl: NaClDriver;
 
   beforeAll(() => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
     nacl = NaCl.getInstance();
   });
 

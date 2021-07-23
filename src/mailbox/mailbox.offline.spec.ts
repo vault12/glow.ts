@@ -1,13 +1,15 @@
 import { Mailbox } from './mailbox';
 import { NaCl } from '../nacl/nacl';
 import { Utils } from '../utils/utils';
+import { CryptoStorage } from '../crypto-storage/crypto-storage';
 
 describe('Mailbox / Offline tests', () => {
   let Alice: Mailbox;
   let Bob: Mailbox;
 
   beforeAll(async () => {
-    NaCl.setInstance();
+    NaCl.setDefaultInstance();
+    CryptoStorage.setDefaultStorageDriver();
     Alice = await Mailbox.new('Alice');
     Bob = await Mailbox.new('Bob');
   });
@@ -63,8 +65,8 @@ describe('Mailbox / Offline tests', () => {
     expect(decoded2).toEqual(utfSource2);
   });
 
-  it('encrypts raw binary data', async () => {
-    const message = await Alice.encodeMessage('Bob_mbx', new Uint8Array([1, 2, 3, 4]));
+  it('produces proper encrypted messages after encryption', async () => {
+    const message = await Alice.encodeMessage('Bob_mbx', '1234');
     expect(message.nonce).toHaveLength(32);
     expect(message.ctext).toHaveLength(28);
   });
