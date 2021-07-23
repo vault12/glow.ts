@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://travis-ci.com/vault12/glow.ts">
-    <img src="https://travis-ci.com/vault12/glow.ts.svg?branch=master" alt="Travis Build Status" />
+    <img src="https://travis-ci.com/vault12/glow.ts.svg?branch=main" alt="Travis Build Status" />
   </a>
   <a href="http://makeapullrequest.com">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
