@@ -122,12 +122,12 @@ export class KeyRing {
 
   async setCommFromSeed(seed: Uint8Array): Promise<void> {
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_seed(seed));
-    await this.storage.save(KeyRing.commKeyTag, this.commKey);
+    await this.storage.save(KeyRing.commKeyTag, this.commKey.toString());
   }
 
   async setCommFromSecKey(rawSecretKey: Uint8Array): Promise<void> {
     this.commKey = new Keys(await this.nacl.crypto_box_keypair_from_raw_sk(rawSecretKey));
-    await this.storage.save(KeyRing.commKeyTag, this.commKey);
+    await this.storage.save(KeyRing.commKeyTag, this.commKey.toString());
   }
 
   async addGuest(guestTag: string, publicKey: Base64): Promise<string> {
