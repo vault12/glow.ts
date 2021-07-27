@@ -1,6 +1,6 @@
 {
   "name": "glow.ts",
-  "version": "0.2.3",
+  "version": "1.0.0",
   "displayName": "Glow.ts",
   "description": "Client library for interacting with Zax Cryptographic Relay Servers",
   "keywords": [
