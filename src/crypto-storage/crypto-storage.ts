@@ -75,8 +75,10 @@ export class CryptoStorage {
     const nonce = await this.nacl.crypto_secretbox_random_nonce();
     const cipherText = await this.nacl.crypto_secretbox(encoded, nonce, this.storageKey);
     // Save the cipher text and nonce
-    await this.driver.set(this.addPrefix(tag), Utils.toBase64(cipherText));
-    await this.driver.set(this.addNonceTag(tag), Utils.toBase64(nonce));
+    await this.driver.setMultiple({
+      [this.addPrefix(tag)]: Utils.toBase64(cipherText),
+      [this.addNonceTag(tag)]: Utils.toBase64(nonce)
+    });
     return true;
   }
 
@@ -88,8 +90,7 @@ export class CryptoStorage {
       throw new Error('[CryptoStorage] Storage key is not set');
     }
     // Get cipher text and nonce from the storage
-    const data = await this.driver.get(this.addPrefix(tag));
-    const nonce = await this.driver.get(this.addNonceTag(tag));
+    const [data, nonce] = await this.driver.getMultiple([this.addPrefix(tag), this.addNonceTag(tag)]);
     // Nothing to do without cipher text or nonce
     if (!data || !nonce) {
       return null;
@@ -109,8 +110,7 @@ export class CryptoStorage {
     if (!this.driver) {
       throw new Error('[CryptoStorage] Storage driver is not set');
     }
-    await this.driver.remove(this.addPrefix(tag));
-    await this.driver.remove(this.addNonceTag(tag));
+    await this.driver.removeMultiple([this.addPrefix(tag), this.addNonceTag(tag)]);
     return true;
   }
 

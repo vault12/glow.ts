@@ -8,18 +8,32 @@ export class LocalStorageDriver implements StorageDriver {
   }
 
   async get(key: string): Promise<string | null> {
-    const item = localStorage.getItem(this.tag(key));
-    return item ? item : null;
+    return (await this.getMultiple([key]))[0];
+  }
+
+  async getMultiple(keys: string[]): Promise<(string | null)[]> {
+    return keys.map(key => localStorage.getItem(this.tag(key)) || null);
   }
 
   async set(key: string, value: string | null): Promise<void> {
-    if (value !== null) {
-      localStorage.setItem(this.tag(key), value);
+    return this.setMultiple({ [key]: value });
+  }
+
+  async setMultiple(values: { [key: string]: string | null; }): Promise<void> {
+    for(const key in values) {
+      const value = values[key];
+      if (value !== null) {
+        localStorage.setItem(this.tag(key), value);
+      }
     }
   }
 
   async remove(key: string): Promise<void> {
-    localStorage.removeItem(this.tag(key));
+    this.removeMultiple([key]);
+  }
+
+  async removeMultiple(keys: string[]): Promise<void> {
+    keys.forEach(key => localStorage.removeItem(this.tag(key)));
   }
 
   private tag(key: string) {
