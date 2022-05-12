@@ -35,10 +35,9 @@ export class KeyRing {
   static async new(id: string): Promise<KeyRing> {
     const nacl = NaCl.getInstance();
     const cryptoStorage = await CryptoStorage.new(id);
-    const commKey = await KeyRing.getCommKey(nacl, cryptoStorage);
+    const commKey = await KeyRing.getCommKeyOrCreate(nacl, cryptoStorage);
     const keyRing = new KeyRing(nacl, cryptoStorage, commKey);
 
-    await cryptoStorage.save(KeyRing.commKeyTag, commKey.toString());
     await keyRing.loadGuestKeys();
     return keyRing;
   }
@@ -163,13 +162,15 @@ export class KeyRing {
     await this.storage.save(KeyRing.guestRegistryTag, Utils.toObject(this.guestKeys.entries()));
   }
 
-  private static async getCommKey(nacl: NaClDriver, storage: CryptoStorage): Promise<Keys> {
-    const commKey = await storage.get(KeyRing.commKeyTag);
-    if (commKey && typeof commKey === 'string') {
-      return new Keys(commKey);
+  private static async getCommKeyOrCreate(nacl: NaClDriver, storage: CryptoStorage): Promise<Keys> {
+    const commKeyRecord = await storage.get(KeyRing.commKeyTag);
+    if (commKeyRecord && typeof commKeyRecord === 'string') {
+      return new Keys(commKeyRecord);
     } else {
       const keypair = await nacl.crypto_box_keypair();
-      return new Keys(keypair);
+      const commKey = new Keys(keypair);
+      await storage.save(KeyRing.commKeyTag, commKey.toString());
+      return commKey;
     }
   }
 
