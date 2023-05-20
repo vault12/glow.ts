@@ -6,17 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://travis-ci.com/vault12/glow.ts">
-    <img src="https://travis-ci.com/vault12/glow.ts.svg?branch=main" alt="Travis Build Status" />
-  </a>
   <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml">
     <img src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg" alt="Github Actions Build Status" />
   </a>
-  <a href="http://makeapullrequest.com">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
-  </a>
   <a href="https://npmjs.com/package/glow.ts">
-    <img src="https://img.shields.io/npm/v/glow.ts" alt="PRs welcome" />
+    <img src="https://img.shields.io/npm/v/glow.ts" alt="NPM Package" />
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
@@ -24,11 +18,8 @@
 </p>
 
 <p align="center">
-  <a href="https://david-dm.org/vault12/glow.ts#info=dependencies">
-    <img src="https://david-dm.org/vault12/glow.ts.svg" alt="dependency Status" />
-  </a>
-  <a href="https://david-dm.org/vault12/glow.ts#info=devDependencies">
-    <img src="https://david-dm.org/vault12/glow.ts/dev-status.svg" alt="devDependency Status" />
+  <a href="http://makeapullrequest.com">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
   </a>
   <a href="https://twitter.com/_Vault12_">
     <img src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" alt="Follow" />
