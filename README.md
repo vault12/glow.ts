@@ -9,6 +9,9 @@
   <a href="https://travis-ci.com/vault12/glow.ts">
     <img src="https://travis-ci.com/vault12/glow.ts.svg?branch=main" alt="Travis Build Status" />
   </a>
+  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml">
+    <img src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg" alt="Github Actions Build Status" />
+  </a>
   <a href="http://makeapullrequest.com">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
   </a>
