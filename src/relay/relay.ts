@@ -1,5 +1,3 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { EncryptionHelper } from '../nacl/encryption.helper';
@@ -180,38 +178,45 @@ export class Relay {
   /**
    * Executes a call to a relay and return raw string response
    */
+  // TODO: extract fetching into saparate function
   private async httpCall(command: string, ...params: string[]): Promise<string> {
-    const requestPayload: AxiosRequestConfig = {
-      url: `${this.url}/${command}`,
-      method: 'post',
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.RELAY_AJAX_TIMEOUT);
+
+    const requestInit: RequestInit = {
+      method: 'POST',
       headers: {
-        'Accept': 'text/plain',
-        'Content-Type': 'text/plain'
+        Accept: 'text/plain',
+        'Content-Type': 'text/plain',
       },
-      data: params.join('\r\n'),
-      responseType: 'text',
-      timeout: config.RELAY_AJAX_TIMEOUT
+      body: params.join('\r\n'),
+      signal: controller.signal,
     };
 
     // NOTE: Network and server errors are not handled ny Glow itself.
     // They should instead be handled where the library is used
-    let response: any;
-    try{
-      response = await axios(requestPayload);
-    } catch (err: any) {
-      if ((err as AxiosError).isAxiosError) {
-        const error = err as AxiosError;
-        if (error.response?.status === 401) {
+    try {
+      const response = await fetch(`${this.url}/${command}`, requestInit);
+      if (!response.ok) {
+        if (response.status === 401) {
           // clear session if unauthorized
           this.clearSession();
           this.clearToken();
         }
-        // when no network connection axios response is undefined
-        throw new NetworkError(error.response?.status || 0);
+        throw new NetworkError(response.status);
       }
-      throw err;
+      return await response.text();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new NetworkError(408);
+      }
+      if (err instanceof NetworkError) {
+        throw err;
+      }
+      throw new NetworkError(500);
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return String(response.data);
   }
 
   /**

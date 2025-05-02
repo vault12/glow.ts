@@ -62,10 +62,9 @@ describe('Mailbox / Messages', () => {
   });
 
   it('should reconnect after token expiration timeout', async () => {
-    // using 'modern' breaks the test in Jest 27+ environment
-    // See https://jestjs.io/blog/2021/05/25/jest-27#flipping-defaults
-    // TODO: fix this
-    jest.useFakeTimers('legacy');
+    jest.useFakeTimers({
+      legacyFakeTimers: true,
+    });
     await Bob.connectToRelay(testRelayURL);
     const connectSpy = jest.spyOn(Bob, 'connectToRelay');
 

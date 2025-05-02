@@ -8,10 +8,22 @@ const config: Config.InitialOptions = {
       statements: 90,
     },
   },
-  setupFiles: ['jest-localstorage-mock'],
-  preset: 'ts-jest',
-  testEnvironment: 'jsdom', // TODO: run tests through both 'node' and 'jsdom'
   testTimeout: 10000,
-  verbose: true
+  verbose: true,
+  projects: [
+    {
+      setupFiles: ['jest-localstorage-mock'],
+      preset: 'ts-jest',
+      displayName: 'node',
+      testEnvironment: 'node',
+    },
+    {
+      setupFiles: ['jest-localstorage-mock'],
+      preset: 'ts-jest',
+      displayName: 'jsdom',
+      testEnvironment: './jsdom-polyfills.environment.ts',
+    },
+  ],
 };
+
 export default config;

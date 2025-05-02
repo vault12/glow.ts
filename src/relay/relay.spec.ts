@@ -1,6 +1,3 @@
-import axios from 'axios';
-import MockAdapter from 'axios-mock-adapter';
-
 import { Relay } from './relay';
 import { NaCl } from '../nacl/nacl';
 import { testRelayURL } from '../tests.helper';
@@ -18,16 +15,10 @@ describe('Relay', () => {
   });
 
   it('should handle server errors', async () => {
-    // This sets the mock adapter on the default Axios instance
-    const mock = new MockAdapter(axios);
-    // Always return 500 Internal Server Error
-    mock.onPost().reply(500);
+    global.fetch = jest.fn().mockRejectedValue(new Error('500'));
 
     const relay = new Relay(testRelayURL);
     const connection = relay.openConnection();
     expect(connection).rejects.toThrow('500');
-
-    // Stop mocking Axios
-    mock.restore();
   });
 });

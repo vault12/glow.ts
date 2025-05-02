@@ -1,16 +1,12 @@
 import { box, BoxKeyPair, randomBytes, secretbox, hash } from 'tweetnacl';
-import { sha256 } from 'js-sha256';
 
 import { NaClDriver } from './nacl-driver.interface';
 import { Keypair } from './keypair.interface';
 import { Utils } from '../utils/utils';
 
-
 /**
  * Implementation based on TweetNaCl.js: {@link https://github.com/dchest/tweetnacl-js}.
- * SHA256 is taken separately from `js-sha256` library, because TweetNacl only offers
- * SHA512 as hashing function, which is incompatible with the current Zax version.
- * {@link https://github.com/emn178/js-sha256}
+ * SHA256 is implemented using Web Crypto API (SubtleCrypto).
  *
  * All the methods of this class are actually synchronous, but they are defined
  * as async to conform to the NaClDriver interface, which may have other implementations.
@@ -67,7 +63,13 @@ export class JsNaClDriver implements NaClDriver {
   }
 
   async crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array> {
-    return this.from_hex(sha256(data));
+    // Use WebCrypto API in both Node.js and browser environments
+    const cryptoProvider = typeof window === 'undefined' 
+      ? (await import('crypto')).webcrypto
+      : crypto;
+    
+    const hashBuffer = await cryptoProvider.subtle.digest('SHA-256', data);
+    return new Uint8Array(hashBuffer);
   }
 
   async random_bytes(size: number): Promise<Uint8Array> {
