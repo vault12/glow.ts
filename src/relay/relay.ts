@@ -178,7 +178,7 @@ export class Relay {
   /**
    * Executes a call to a relay and return raw string response
    */
-  // TODO: extract fetching into saparate function
+  // TODO: extract fetching into separate function
   private async httpCall(command: string, ...params: string[]): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.RELAY_AJAX_TIMEOUT);
