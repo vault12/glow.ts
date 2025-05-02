@@ -378,7 +378,7 @@ export class Mailbox {
     let uint8ArrayCtext: Uint8Array;
     try {
       uint8ArrayCtext = Utils.fromBase64(ctext);
-    } catch (err) {
+    } catch {
       // looks like ctext was not encoded
       return null;
     }
