@@ -6,15 +6,15 @@
 </p>
 
 <p align="center">
-  [<img alt="Github Actions Build Status" src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg">](https://github.com/vault12/glow.ts/actions/workflows/ci.yml) 
-  [<img alt="Coverage total" src="https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg">](https://github.com/vault12/glow.ts/actions/workflows/ci.yml) 
-  [<img alt="NPM Package" src="https://img.shields.io/npm/v/glow.ts">](https://npmjs.com/package/glow.ts) 
-  [<img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg">](https://opensource.org/licenses/MIT) 
+  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml"><img src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg" alt="Github Actions Build Status" /></a>
+  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml"><img src="https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg" alt="Coverage total" /></a>
+  <a href="https://npmjs.com/package/glow.ts"><img src="https://img.shields.io/npm/v/glow.ts" alt="NPM Package" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
 </p>
 
 <p align="center">
-  [<img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">](http://makeapullrequest.com) 
-  [<img alt="Follow" src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social">](https://twitter.com/_Vault12_) 
+  <a href="http://makeapullrequest.com"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" /></a>
+  <a href="https://twitter.com/_Vault12_"><img src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" alt="Follow" /></a>
 </p>
 
 **Glow.ts** is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg). This reference implementation is written in TypeScript. The original deprecated implementation in CoffeeScript can be [found there](https://github.com/vault12/glow).
