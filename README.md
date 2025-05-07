@@ -6,25 +6,25 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml">
+  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml" style="display:inline-flex">
     <img src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg" alt="Github Actions Build Status" />
   </a>
-  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml">
+  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml" style="display:inline-flex">
     <img src="https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg" alt="Coverage total" />
   </a>
-  <a href="https://npmjs.com/package/glow.ts">
+  <a href="https://npmjs.com/package/glow.ts" style="display:inline-flex">
     <img src="https://img.shields.io/npm/v/glow.ts" alt="NPM Package" />
   </a>
-  <a href="https://opensource.org/licenses/MIT">
+  <a href="https://opensource.org/licenses/MIT" style="display:inline-flex">
     <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
   </a>
 </p>
 
 <p align="center">
-  <a href="http://makeapullrequest.com">
+  <a href="http://makeapullrequest.com" style="display:inline-flex">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
   </a>
-  <a href="https://twitter.com/_Vault12_">
+  <a href="https://twitter.com/_Vault12_" style="display:inline-flex">
     <img src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" alt="Follow" />
   </a>
 </p>
