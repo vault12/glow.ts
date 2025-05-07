@@ -8,6 +8,7 @@ const config: Config.InitialOptions = {
       statements: 90,
     },
   },
+  coverageReporters: ['json-summary'],
   testTimeout: 10000,
   verbose: true,
   projects: [

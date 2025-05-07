@@ -26,6 +26,8 @@
   </a>
 </p>
 
+![Coverage total](https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg)
+
 **Glow.ts** is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg). This reference implementation is written in TypeScript. The original deprecated implementation in CoffeeScript can be [found there](https://github.com/vault12/glow).
 
 ## Installation
