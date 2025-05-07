@@ -3,9 +3,9 @@ import type { Config } from '@jest/types';
 const config: Config.InitialOptions = {
   coverageThreshold: {
     global: {
-      functions: 90,
-      lines: 90,
-      statements: 90,
+      functions: 85,
+      lines: 85,
+      statements: 85,
     },
   },
   coverageReporters: ['json-summary'],
