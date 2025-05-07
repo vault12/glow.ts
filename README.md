@@ -9,6 +9,9 @@
   <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml">
     <img src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg" alt="Github Actions Build Status" />
   </a>
+  <a href="https://github.com/vault12/glow.ts/actions/workflows/ci.yml">
+    <img src="https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg" alt="Coverage total" />
+  </a>
   <a href="https://npmjs.com/package/glow.ts">
     <img src="https://img.shields.io/npm/v/glow.ts" alt="NPM Package" />
   </a>
@@ -25,8 +28,6 @@
     <img src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" alt="Follow" />
   </a>
 </p>
-
-![Coverage total](https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg)
 
 **Glow.ts** is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg). This reference implementation is written in TypeScript. The original deprecated implementation in CoffeeScript can be [found there](https://github.com/vault12/glow).
 
