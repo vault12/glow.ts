@@ -6,15 +6,15 @@
 </p>
 
 <p align="center">
-  [![Build Status](https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg)](https://github.com/vault12/glow.ts/actions/workflows/ci.yml)
-  [![Coverage](https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg)](https://github.com/vault12/glow.ts/actions/workflows/ci.yml)
-  [![NPM](https://img.shields.io/npm/v/glow.ts)](https://npmjs.com/package/glow.ts)
-  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+  [<img alt="Github Actions Build Status" src="https://github.com/vault12/glow.ts/actions/workflows/ci.yml/badge.svg" />](https://github.com/vault12/glow.ts/actions/workflows/ci.yml)
+  [<img alt="Coverage total" src="https://raw.githubusercontent.com/vault12/glow.ts/badges/badges/coverage-total.svg" />](https://github.com/vault12/glow.ts/actions/workflows/ci.yml)
+  [<img alt="NPM Package" src="https://img.shields.io/npm/v/glow.ts" />](https://npmjs.com/package/glow.ts)
+  [<img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue.svg" />](https://opensource.org/licenses/MIT)
 </p>
 
 <p align="center">
-  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
-  [![Twitter Follow](https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social)](https://twitter.com/_Vault12_)
+  [<img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" />](http://makeapullrequest.com)
+  [<img alt="Follow" src="https://img.shields.io/twitter/follow/_Vault12_?label=Follow&style=social" />](https://twitter.com/_Vault12_)
 </p>
 
 **Glow.ts** is a client library for interacting with [Zax Cryptographic Relay](https://github.com/vault12/zax), a [NaCl-based Cryptographic Relay](https://s3-us-west-1.amazonaws.com/vault12/zax_infogfx.jpg). This reference implementation is written in TypeScript. The original deprecated implementation in CoffeeScript can be [found there](https://github.com/vault12/glow).
