@@ -30,7 +30,7 @@ jobs:
         run: npm run test
 
       - name: Delete remote badges branch
-        run: git push origin --delete badges
+        run: git push origin --delete badges || true
 
       - name: Create badges branch
         run: git checkout -b badges
