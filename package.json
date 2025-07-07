@@ -23,10 +23,8 @@
   "homepage": "https://github.com/vault12/glow.ts#readme",
   "license": "MIT",
   "scripts": {
-    "clean": "rm -rf dist/",
-    "build:esm": "tsc",
-    "build:commonjs": "tsc -p ./tscconfig.cjs.json",
-    "build": "npm run clean && npm run build:esm && npm run build:commonjs",
+    "build": "vite build",
+    "dev": "vite build --watch",
     "prepublishOnly": "npm run build",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
@@ -36,12 +34,17 @@
     "test:coverage": "jest --selectProjects node --coverage",
     "test:watch": "jest --selectProjects node --watch"
   },
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/types/index.d.ts",
+  "type": "module",
   "files": [
-    "dist/**/*"
+    "dist"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/glow.es.js",
+      "require": "./dist/glow.cjs.js"
+    }
+  },
   "dependencies": {
     "async-mutex": "0.5.0",
     "tweetnacl": "1.0.3"
@@ -49,6 +52,7 @@
   "devDependencies": {
     "@eslint/js": "9.25.1",
     "@jest/types": "29.6.3",
+    "@microsoft/api-extractor": "7.52.8",
     "@types/jest": "29.5.14",
     "@types/node": "22.15.3",
     "eslint": "9.25.1",
@@ -58,6 +62,8 @@
     "ts-jest": "29.3.2",
     "ts-node": "10.9.2",
     "typescript": "5.8.3",
-    "typescript-eslint": "8.31.1"
+    "typescript-eslint": "8.31.1",
+    "unplugin-dts": "1.0.0-beta.3",
+    "vite": "7.0.2"
   }
 }
