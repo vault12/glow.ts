@@ -33,7 +33,7 @@ export class Utils {
     return encoded.join('');
   }
 
-  static toObject(pairs: IterableIterator<[string, any]>) {
+  static toObject(pairs: IterableIterator<[string, unknown]>) {
     return Array.from(pairs).reduce(
       (acc, [key, value]) => Object.assign(acc, { [key]: value }),
       {},

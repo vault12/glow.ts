@@ -63,10 +63,12 @@ export class JsNaClDriver implements NaClDriver {
   }
 
   async crypto_hash_sha256(data: Uint8Array): Promise<Uint8Array> {
-    // Use WebCrypto API in both Node.js and browser environments
-    const cryptoProvider = typeof window === 'undefined' 
-      ? (await import('crypto')).webcrypto
-      : crypto;
+    // In Node.js, globalThis.crypto is implementation of WebCrypto API, available since Node.js 16
+    // In browsers, globalThis.crypto is the standard Web Crypto API
+    const cryptoProvider = globalThis.crypto;
+    if (!cryptoProvider || !cryptoProvider.subtle) {
+      throw new Error('Web Crypto API is not available. Please use a modern browser or Node.js 16+.');
+    }
     
     const hashBuffer = await cryptoProvider.subtle.digest('SHA-256', data);
     return new Uint8Array(hashBuffer);

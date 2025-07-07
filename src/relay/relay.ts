@@ -127,7 +127,7 @@ export class Relay {
       await this.nacl.encode_utf8(message), this.publicKey, Utils.fromBase64(this.sessionKeys?.privateKey));
   }
 
-  async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
+  async decodeMessage<T>(nonce: Base64, ctext: Base64): Promise<T> {
     const relayPk = this.publicKey;
     if (!relayPk) {
       throw new Error('[Relay] No relay public key found, open the connection first');

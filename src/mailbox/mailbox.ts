@@ -111,7 +111,7 @@ export class Mailbox {
   async download(url: string) {
     const relay = await this.prepareRelay(url);
     const response = await this.runRelayCommand(relay, RelayCommand.download);
-    const messages: ZaxRawMessage[] = await this.decryptResponse(relay, response);
+    const messages: ZaxRawMessage[] = await this.decryptResponse<ZaxRawMessage[]>(relay, response);
 
     const parsedMessages: ZaxParsedMessage[] = [];
     for (const message of messages) {
@@ -216,7 +216,7 @@ export class Mailbox {
       metadata
     });
 
-    const decrypted = await this.decryptResponse(relay, response);
+    const decrypted = await this.decryptResponse<StartFileUploadResponse>(relay, response);
     // append symmetric secret key (unique for this upload session) to the server response
     decrypted.skey = secretKey;
     return decrypted;
@@ -273,7 +273,7 @@ export class Mailbox {
     const relay = await this.prepareRelay(url);
     const response = await this.runRelayCommand(relay, RelayCommand.downloadFileChunk, { uploadID, part });
     const [nonce, ctext, fileCtext] = response;
-    const decoded = await relay.decodeMessage(nonce, ctext);
+    const decoded = await relay.decodeMessage<{nonce: string}>(nonce, ctext);
     return await EncryptionHelper.decodeMessageSymmetric(decoded.nonce, fileCtext, skey);
   }
 
@@ -338,7 +338,7 @@ export class Mailbox {
    * Encrypts the payload of the command and sends it to a relay
    */
   private async runRelayCommand(
-    relay: Relay, command: RelayCommand, params?: {[key:string]: any}, ctext?: string): Promise<string[]> {
+    relay: Relay, command: RelayCommand, params?: {[key:string]: unknown}, ctext?: string): Promise<string[]> {
     params = { cmd: command, ...params };
     const hpk = await this.keyRing.getHpk();
     const message = await relay.encodeMessage(JSON.stringify(params));
@@ -349,9 +349,9 @@ export class Mailbox {
    * Parses relay's response to a command, for those commands that expect an encrypted message in return.
    * Two lines of POST response will be nonce and ctext
    */
-  private async decryptResponse(relay: Relay, response: string[]) {
+  private async decryptResponse<T>(relay: Relay, response: string[]) {
     const [nonce, ctext] = response;
-    return await relay.decodeMessage(nonce, ctext);
+    return await relay.decodeMessage<T>(nonce, ctext);
   }
 
   // ---------- Message encoding / decoding ----------
