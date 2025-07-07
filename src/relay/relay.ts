@@ -5,7 +5,7 @@ import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 import { RelayCommand } from '../zax.interface';
-import { NetworkError } from './network-error';
+import { GlowNetworkError } from './network-error';
 
 export interface RelayConnectionData {
   h2Signature: Uint8Array;
@@ -203,17 +203,25 @@ export class Relay {
           this.clearSession();
           this.clearToken();
         }
-        throw new NetworkError(response.status);
+        throw new GlowNetworkError(response.status);
       }
       return await response.text();
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
-        throw new NetworkError(408);
+        // Timeout occurred during fetch request or while downloading response body
+        throw new GlowNetworkError(408);
       }
-      if (err instanceof NetworkError) {
+      if (err instanceof GlowNetworkError) {
         throw err;
       }
-      throw new NetworkError(500);
+      if (err instanceof TypeError) {
+        // Network layer errors (no internet, DNS failure, CORS, etc.)
+        // https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch#exceptions
+        // Use status 0 to indicate network connectivity issues
+        throw new GlowNetworkError(0);
+      }
+      // For any other unexpected errors, re-throw the original error
+      throw err;
     } finally {
       clearTimeout(timeoutId);
     }

@@ -1,7 +1,7 @@
-export class NetworkError extends Error {
-  readonly name = 'NetworkError';
+export class GlowNetworkError extends Error {
+  readonly name = 'GlowNetworkError';
 
   constructor(public status: number|undefined) {
-    super(`NetworkError status: ${status}`);
+    super(`GlowNetworkError status: ${status}`);
   }
 }
