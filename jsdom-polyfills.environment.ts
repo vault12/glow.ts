@@ -11,7 +11,7 @@ export default class JSDOMPolyfillsEnvironment extends JSDOMEnvironment {
     this.global.Request = Request;
     this.global.Response = Response;
 
-    // addopded from https://github.com/jsdom/jsdom/issues/1612#issuecomment-1723498282
+    // adopded from https://github.com/jsdom/jsdom/issues/1612#issuecomment-1723498282
     Object.defineProperty(this.global, 'crypto', { value: webcrypto });
   }
 }
