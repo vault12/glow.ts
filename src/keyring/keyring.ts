@@ -148,7 +148,7 @@ export class KeyRing {
   }
 
   private async loadGuestKeys() {
-    const guestKeys = await this.storage.get(KeyRing.guestRegistryTag) as {[key:string]: any};
+    const guestKeys = await this.storage.get<{[key:string]: KeyRecord}>(KeyRing.guestRegistryTag);
     if (!guestKeys) {
       return;
     } else if (typeof guestKeys === 'object') {

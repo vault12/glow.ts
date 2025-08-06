@@ -82,7 +82,7 @@ export class CryptoStorage {
     return true;
   }
 
-  async get(tag: string): Promise<unknown> {
+  async get<T>(tag: string): Promise<T | null> {
     if (!this.driver) {
       throw new Error('[CryptoStorage] Storage driver is not set');
     }
@@ -100,7 +100,7 @@ export class CryptoStorage {
     const source = await this.nacl.crypto_secretbox_open(dataBinary, nonceBinary, this.storageKey);
     if (source) {
       const decoded = await this.nacl.decode_utf8(source);
-      return JSON.parse(decoded);
+      return JSON.parse(decoded) as T;
     } else {
       throw new Error('[CryptoStorage] crypto_secretbox_open: decryption error');
     }

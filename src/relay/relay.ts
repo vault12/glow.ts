@@ -1,5 +1,3 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-
 import { NaCl } from '../nacl/nacl';
 import { NaClDriver, EncryptedMessage } from '../nacl/nacl-driver.interface';
 import { EncryptionHelper } from '../nacl/encryption.helper';
@@ -7,7 +5,7 @@ import { config } from '../config';
 import { Base64, Utils } from '../utils/utils';
 import { Keys } from '../keys/keys';
 import { RelayCommand } from '../zax.interface';
-import { NetworkError } from './network-error';
+import { GlowNetworkError } from './network-error';
 
 export interface RelayConnectionData {
   h2Signature: Uint8Array;
@@ -129,7 +127,7 @@ export class Relay {
       await this.nacl.encode_utf8(message), this.publicKey, Utils.fromBase64(this.sessionKeys?.privateKey));
   }
 
-  async decodeMessage(nonce: Base64, ctext: Base64): Promise<any> {
+  async decodeMessage<T>(nonce: Base64, ctext: Base64): Promise<T> {
     const relayPk = this.publicKey;
     if (!relayPk) {
       throw new Error('[Relay] No relay public key found, open the connection first');
@@ -180,38 +178,53 @@ export class Relay {
   /**
    * Executes a call to a relay and return raw string response
    */
+  // TODO: extract fetching into separate function
   private async httpCall(command: string, ...params: string[]): Promise<string> {
-    const requestPayload: AxiosRequestConfig = {
-      url: `${this.url}/${command}`,
-      method: 'post',
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.RELAY_AJAX_TIMEOUT);
+
+    const requestInit: RequestInit = {
+      method: 'POST',
       headers: {
-        'Accept': 'text/plain',
-        'Content-Type': 'text/plain'
+        Accept: 'text/plain',
+        'Content-Type': 'text/plain',
       },
-      data: params.join('\r\n'),
-      responseType: 'text',
-      timeout: config.RELAY_AJAX_TIMEOUT
+      body: params.join('\r\n'),
+      signal: controller.signal,
     };
 
     // NOTE: Network and server errors are not handled ny Glow itself.
     // They should instead be handled where the library is used
-    let response: any;
-    try{
-      response = await axios(requestPayload);
-    } catch (err: any) {
-      if ((err as AxiosError).isAxiosError) {
-        const error = err as AxiosError;
-        if (error.response?.status === 401) {
+    try {
+      const response = await fetch(`${this.url}/${command}`, requestInit);
+      if (!response.ok) {
+        if (response.status === 401) {
           // clear session if unauthorized
           this.clearSession();
           this.clearToken();
         }
-        // when no network connection axios response is undefined
-        throw new NetworkError(error.response?.status || 0);
+        throw new GlowNetworkError(response.status);
       }
+      return await response.text();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Timeout occurred during fetch request or while downloading response body
+        throw new GlowNetworkError(408);
+      }
+      if (err instanceof GlowNetworkError) {
+        throw err;
+      }
+      if (err instanceof TypeError) {
+        // Network layer errors (no internet, DNS failure, CORS, etc.)
+        // https://developer.mozilla.org/en-US/docs/Web/API/Window/fetch#exceptions
+        // Use status 0 to indicate network connectivity issues
+        throw new GlowNetworkError(0);
+      }
+      // For any other unexpected errors, re-throw the original error
       throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return String(response.data);
   }
 
   /**

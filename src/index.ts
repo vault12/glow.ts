@@ -1,9 +1,10 @@
 import { NaCl } from './nacl/nacl';
-import { Keys } from './keys/keys.js';
-import { KeyRing } from './keyring/keyring.js';
-import { CryptoStorage } from './crypto-storage/crypto-storage.js';
-import { StorageDriver } from './crypto-storage/storage-driver.interface.js';
-import { LocalStorageDriver } from './crypto-storage/local-storage.driver.js';
+import { Keypair } from './nacl/keypair.interface';
+import { Keys } from './keys/keys';
+import { KeyRing } from './keyring/keyring';
+import { CryptoStorage } from './crypto-storage/crypto-storage';
+import { StorageDriver } from './crypto-storage/storage-driver.interface';
+import { LocalStorageDriver } from './crypto-storage/local-storage.driver';
 import { Mailbox } from './mailbox/mailbox';
 import { Relay } from './relay/relay';
 import {
@@ -12,27 +13,28 @@ import {
 import { JsNaClDriver } from './nacl/js-nacl-driver';
 import { Utils } from './utils/utils';
 import { NaClDriver } from './nacl/nacl-driver.interface';
-import { NetworkError } from './relay/network-error';
+import { GlowNetworkError } from './relay/network-error';
 import { InMemoryStorage } from './crypto-storage/in-memory-storage';
 
 export {
   NaCl,
+  type Keypair,
   Keys,
   KeyRing,
   Mailbox,
   Relay,
   CryptoStorage,
-  StorageDriver,
+  type StorageDriver,
   LocalStorageDriver,
   ZaxMessageKind,
-  ZaxTextMessage,
-  ZaxFileMessage,
-  ZaxPlainMessage,
-  ZaxParsedMessage,
-  FileStatusResponse,
-  NaClDriver,
+  type ZaxTextMessage,
+  type ZaxFileMessage,
+  type ZaxPlainMessage,
+  type ZaxParsedMessage,
+  type FileStatusResponse,
+  type NaClDriver,
   JsNaClDriver,
   Utils,
-  NetworkError,
+  GlowNetworkError,
   InMemoryStorage
 };
