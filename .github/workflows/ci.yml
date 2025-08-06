@@ -29,6 +29,24 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Delete remote badges branch 🔴
+        run: git push origin --delete badges || true
+
+      - name: Create badges branch ➕
+        run: git checkout -b badges
+
+      - name: Tests coverage 🔍
+        run: npm run test:coverage
+
+      - name: Generating coverage badges ⚙️
+        uses: jpb06/coverage-badges-action@latest
+        with:
+          branches: '*'
+          target-branch: badges
+
+      - name: Push badges branch ⬆️
+        run: git push origin badges
+
       - name: Send Slack message 🔔
         # Trigger even if the job fails
         if: always()
