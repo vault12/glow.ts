@@ -10,8 +10,10 @@ export default class JSDOMPolyfillsEnvironment extends JSDOMEnvironment {
     this.global.Headers = Headers;
     this.global.Request = Request;
     this.global.Response = Response;
+    // added for Node 24 support https://github.com/jsdom/jsdom/issues/1724#issuecomment-1856372369
+    this.global.AbortController = AbortController;
 
-    // adopded from https://github.com/jsdom/jsdom/issues/1612#issuecomment-1723498282
+    // adopted from https://github.com/jsdom/jsdom/issues/1612#issuecomment-1723498282
     Object.defineProperty(this.global, 'crypto', { value: webcrypto });
   }
 }
