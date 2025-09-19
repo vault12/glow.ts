@@ -69,8 +69,8 @@ export class JsNaClDriver implements NaClDriver {
     if (!cryptoProvider || !cryptoProvider.subtle) {
       throw new Error('Web Crypto API is not available. Please use a modern browser or Node.js 16+.');
     }
-    
-    const hashBuffer = await cryptoProvider.subtle.digest('SHA-256', data);
+
+    const hashBuffer = await cryptoProvider.subtle.digest('SHA-256', data as BufferSource);
     return new Uint8Array(hashBuffer);
   }
 
