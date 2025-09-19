@@ -12,16 +12,16 @@ jobs:
 
     steps:
       - name: Checkout 🛎️
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Install Node 🔧
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: '24'
           cache: 'npm'
 
       - name: Install Dependencies 🔧
-        run: npm install
+        run: npm ci
 
       - name: Lint
         run: npm run lint
