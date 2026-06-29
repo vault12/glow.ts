@@ -1,6 +1,6 @@
 {
   "name": "glow.ts",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "displayName": "Glow.ts",
   "description": "Client library for interacting with Zax Cryptographic Relay Servers",
   "keywords": [
@@ -50,20 +50,20 @@
     "tweetnacl": "1.0.3"
   },
   "devDependencies": {
-    "@eslint/js": "9.36.0",
-    "@jest/types": "30.0.5",
+    "@eslint/js": "10.0.1",
+    "@jest/types": "30.4.1",
     "@microsoft/api-extractor": "^7.57.7",
     "@types/jest": "30.0.0",
     "@types/node": "24.5.2",
-    "eslint": "9.36.0",
-    "jest": "30.1.3",
-    "jest-environment-jsdom": "30.1.2",
+    "eslint": "10.6.0",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
     "jest-localstorage-mock": "2.4.26",
-    "ts-jest": "29.4.4",
+    "ts-jest": "29.4.11",
     "ts-node": "10.9.2",
     "typescript": "5.8.2",
-    "typescript-eslint": "8.44.0",
-    "unplugin-dts": "1.0.0-beta.6",
-    "vite": "7.3.2"
+    "typescript-eslint": "8.62.0",
+    "unplugin-dts": "1.0.3",
+    "vite": "8.1.0"
   }
 }
