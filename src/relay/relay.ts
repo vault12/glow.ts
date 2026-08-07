@@ -203,7 +203,9 @@ export class Relay {
           this.clearSession();
           this.clearToken();
         }
-        throw new GlowNetworkError(response.status);
+        // the relay names safe-to-reveal rejection reasons in this header;
+        // reading it cross-origin requires the relay to expose it via CORS
+        throw new GlowNetworkError(response.status, response.headers.get('x-error-details') ?? undefined);
       }
       return await response.text();
     } catch (err: unknown) {
