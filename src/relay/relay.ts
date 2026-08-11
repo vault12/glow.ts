@@ -203,9 +203,13 @@ export class Relay {
           this.clearSession();
           this.clearToken();
         }
-        // the relay names safe-to-reveal rejection reasons in this header;
-        // reading it cross-origin requires the relay to expose it via CORS
-        throw new GlowNetworkError(response.status, response.headers.get('x-error-details') ?? undefined);
+        // the relay names safe-to-reveal rejection reasons in X-Error-Details
+        // and the seconds until a rate-limited sender may retry in Retry-After;
+        // reading either cross-origin requires the relay to expose it via CORS
+        const retryAfter = Number(response.headers.get('retry-after'));
+        throw new GlowNetworkError(response.status, response.headers.get('x-error-details') ?? undefined,
+          // delta-seconds only: an absent header or an HTTP-date form is ignored
+          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined);
       }
       return await response.text();
     } catch (err: unknown) {
