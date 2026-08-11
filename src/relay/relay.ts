@@ -206,10 +206,11 @@ export class Relay {
         // the relay names safe-to-reveal rejection reasons in X-Error-Details
         // and the seconds until a rate-limited sender may retry in Retry-After;
         // reading either cross-origin requires the relay to expose it via CORS
-        const retryAfter = Number(response.headers.get('retry-after'));
+        const retryAfter = response.headers.get('retry-after');
         throw new GlowNetworkError(response.status, response.headers.get('x-error-details') ?? undefined,
-          // delta-seconds only: an absent header or an HTTP-date form is ignored
-          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined);
+          // strict delta-seconds (1*DIGIT): zero is valid ("retry now"); the
+          // HTTP-date form and any other spelling are ignored
+          retryAfter !== null && /^\d+$/.test(retryAfter) ? parseInt(retryAfter, 10) : undefined);
       }
       return await response.text();
     } catch (err: unknown) {
