@@ -23,10 +23,16 @@ describe('Relay', () => {
   });
 
   describe('relay rejections', () => {
-    const rejection = (status: number, details?: string) => ({
+    const rejection = (status: number, details?: string, retryAfter?: string) => ({
       ok: false,
       status,
-      headers: { get: (name: string) => (name.toLowerCase() === 'x-error-details' ? details ?? null : null) },
+      headers: {
+        get: (name: string) => {
+          if (name.toLowerCase() === 'x-error-details') return details ?? null;
+          if (name.toLowerCase() === 'retry-after') return retryAfter ?? null;
+          return null;
+        },
+      },
     });
 
     it('carries X-Error-Details from the relay on the thrown error', async () => {
@@ -49,8 +55,55 @@ describe('Relay', () => {
         name: 'GlowNetworkError',
         status: 429,
         details: undefined,
+        retryAfter: undefined,
         message: 'GlowNetworkError status: 429',
       });
+    });
+
+    it('carries Retry-After delta-seconds from the relay on the thrown error', async () => {
+      global.fetch = jest.fn().mockResolvedValue(rejection(429, undefined, '61'));
+
+      const relay = new Relay(testRelayURL);
+      await expect(relay.openConnection()).rejects.toMatchObject({
+        name: 'GlowNetworkError',
+        status: 429,
+        retryAfter: 61,
+      });
+    });
+
+    it('carries a zero Retry-After as a valid value', async () => {
+      global.fetch = jest.fn().mockResolvedValue(rejection(429, undefined, '0'));
+
+      const relay = new Relay(testRelayURL);
+      await expect(relay.openConnection()).rejects.toMatchObject({
+        name: 'GlowNetworkError',
+        status: 429,
+        retryAfter: 0,
+      });
+    });
+
+    it('ignores a Retry-After value that is not delta-seconds', async () => {
+      global.fetch = jest.fn().mockResolvedValue(rejection(429, undefined, 'Wed, 21 Oct 2026 07:28:00 GMT'));
+
+      const relay = new Relay(testRelayURL);
+      await expect(relay.openConnection()).rejects.toMatchObject({
+        name: 'GlowNetworkError',
+        status: 429,
+        retryAfter: undefined,
+      });
+    });
+
+    it('ignores Retry-After spellings outside the decimal-integer form', async () => {
+      for (const value of ['1.5', '1e3', '0x10', '-5']) {
+        global.fetch = jest.fn().mockResolvedValue(rejection(429, undefined, value));
+
+        const relay = new Relay(testRelayURL);
+        await expect(relay.openConnection()).rejects.toMatchObject({
+          name: 'GlowNetworkError',
+          status: 429,
+          retryAfter: undefined,
+        });
+      }
     });
   });
 });
