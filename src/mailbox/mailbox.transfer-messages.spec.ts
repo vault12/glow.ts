@@ -2,6 +2,7 @@ import { CryptoStorage } from '../crypto-storage/crypto-storage';
 import { InMemoryStorage } from '../crypto-storage/in-memory-storage';
 import { NaCl } from '../nacl/nacl';
 import { testRelayURL } from '../tests.helper';
+import { ZaxMessageKind } from '../zax.interface';
 import { Mailbox } from './mailbox';
 
 
@@ -43,6 +44,10 @@ describe('Mailbox / Transfer Messages', () => {
         it('download', async () => {
           const [ message ] = await Bob.download(testRelayURL);
           expect(message.data).toEqual(msg);
+          // an encrypted message is authenticated with Alice's key; a plaintext one can not be,
+          // so it must surface as `unverified` and never as an authenticated `message`
+          expect(message.kind).toEqual(encrypt ? ZaxMessageKind.message : ZaxMessageKind.unverified);
+          expect(message.senderTag).toEqual('Alice');
           Bob.delete(testRelayURL, [message.nonce]);
         });
       });

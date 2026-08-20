@@ -41,7 +41,8 @@ export enum MessageStatusResponse {
 export enum ZaxMessageKind {
   message = 'message',
   file = 'file',
-  plain = 'plain'
+  plain = 'plain',
+  unverified = 'unverified'
 }
 
 /**
@@ -84,7 +85,32 @@ export interface ZaxPlainMessage {
   kind: ZaxMessageKind.plain;
 }
 
-export type ZaxParsedMessage = ZaxPlainMessage | ZaxFileMessage | ZaxTextMessage;
+/**
+ * A message that claims to come from a known guest (the relay-supplied sender HPK
+ * matched a keyring entry), but whose payload could NOT be authenticated with that
+ * guest's key. This happens both when the sender deliberately uploaded plaintext
+ * (`upload` with `encrypt = false`) and when the ciphertext was forged or tampered
+ * with in transit or by the relay — the two cases are indistinguishable on receipt.
+ * The claimed `senderTag` is therefore unproven: never treat `data` as authentic
+ * unless the application has its own reason to trust unauthenticated content
+ * on this channel.
+ */
+export interface ZaxUnverifiedMessage {
+  /**
+   * Raw payload exactly as supplied by the relay, not authenticated or decrypted
+   */
+  data: string;
+  time: number;
+  /**
+   * Tag of the keyring guest the message claims to be from. NOT verified
+   */
+  senderTag: string;
+  from: Base64;
+  nonce: Base64;
+  kind: ZaxMessageKind.unverified;
+}
+
+export type ZaxParsedMessage = ZaxPlainMessage | ZaxFileMessage | ZaxTextMessage | ZaxUnverifiedMessage;
 
 // -------------- File command responses --------------
 // See https://github.com/vault12/zax/wiki/Zax-2.0-File-Commands

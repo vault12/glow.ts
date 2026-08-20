@@ -8,7 +8,8 @@ import { LocalStorageDriver } from './crypto-storage/local-storage.driver';
 import { Mailbox } from './mailbox/mailbox';
 import { Relay } from './relay/relay';
 import {
-  ZaxMessageKind, ZaxTextMessage, ZaxFileMessage, ZaxPlainMessage, ZaxParsedMessage, FileStatusResponse
+  ZaxMessageKind, ZaxTextMessage, ZaxFileMessage, ZaxPlainMessage, ZaxUnverifiedMessage, ZaxParsedMessage,
+  FileStatusResponse
 } from './zax.interface';
 import { JsNaClDriver } from './nacl/js-nacl-driver';
 import { Utils } from './utils/utils';
@@ -30,6 +31,7 @@ export {
   type ZaxTextMessage,
   type ZaxFileMessage,
   type ZaxPlainMessage,
+  type ZaxUnverifiedMessage,
   type ZaxParsedMessage,
   type FileStatusResponse,
   type NaClDriver,

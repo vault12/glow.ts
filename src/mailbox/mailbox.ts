@@ -17,6 +17,7 @@ import {
   ZaxFileMessage,
   ZaxPlainMessage,
   ZaxTextMessage,
+  ZaxUnverifiedMessage,
   ZaxParsedMessage
 } from '../zax.interface';
 import { RelayFactory } from '../relay/relay-factory';
@@ -90,7 +91,12 @@ export class Mailbox {
   /**
    * Sends a free-form object to a guest we already have in our keyring. Set `encrypt` to `false` to
    * send a plaintext message. Returns a token that can be used with `messageStatus` command to check
-   * the status of the message
+   * the status of the message.
+   *
+   * WARNING: a plaintext message (`encrypt = false`) has no confidentiality and no authenticity:
+   * on receipt it is indistinguishable from a message forged by the relay, and `download` will
+   * surface it as `ZaxMessageKind.unverified`. Only use plaintext for bootstrap flows where the
+   * recipient does not have the sender's key yet, and never trust its content
    */
   async upload(url: string, guestKey: string, message: string, encrypt = true): Promise<Base64> {
     const relay = await this.prepareRelay(url);
@@ -104,9 +110,10 @@ export class Mailbox {
 
   /**
    * Downloads all messages from a relay, decrypts them with a relay key,
-   * and then parses each message to find out if it's a text message, file message,
-   * or if it can't be decrypted because HPK is missing in the keyring.
-   * Returns an array of mixed messages
+   * and then parses each message to find out if it's an authenticated text message (`message`),
+   * a file message (`file`), a message from a sender whose HPK is missing in the keyring
+   * (`plain`), or a message claiming to be from a known sender whose payload failed
+   * authenticated decryption (`unverified`). Returns an array of mixed messages
    */
   async download(url: string) {
     const relay = await this.prepareRelay(url);
@@ -151,13 +158,17 @@ export class Mailbox {
   }
 
   /**
-   * Attempts to decrypt a regular encrypted Zax message. Returns plain message if it was sent encrypted
+   * Attempts authenticated decryption of a regular Zax message. A payload that can not be
+   * authenticated with the sender's key (a plaintext upload, a forged message, or a tampered
+   * ciphertext — indistinguishable cases on receipt) is returned as `ZaxMessageKind.unverified`
+   * with the raw relay-supplied bytes, so that the application can decide whether to trust it
    */
-  private async parseTextMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxTextMessage> {
-    let data = await this.decodeMessage(senderTag, message.nonce, message.data);
-    // If the message was sent unencrypted, the line above will return `null`
-    if (!data) {
-      data = message.data;
+  private async parseTextMessage(message: ZaxRawMessage,
+    senderTag: string): Promise<ZaxTextMessage | ZaxUnverifiedMessage> {
+    const data = await this.decodeMessage(senderTag, message.nonce, message.data);
+    if (data === null) {
+      return ({ data: message.data, time: message.time, senderTag, from: message.from,
+        nonce: message.nonce, kind: ZaxMessageKind.unverified });
     }
     return ({ data, time: message.time, senderTag, nonce: message.nonce, kind: ZaxMessageKind.message });
   }
@@ -370,7 +381,9 @@ export class Mailbox {
 
   /**
    * Decodes a ciphertext from a guest key already in our keyring with this nonce
-   * @returns null if failed to decode
+   * @returns null if the payload could not be authenticated and decrypted with this guest's key.
+   * A `null` carries no information about why: the payload may have been sent as plaintext,
+   * forged, or tampered with — these cases can not be told apart on the receiving side
    */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64) {
     const guestPk = this.getGuestKey(guest);
@@ -379,7 +392,7 @@ export class Mailbox {
     try {
       uint8ArrayCtext = Utils.fromBase64(ctext);
     } catch {
-      // looks like ctext was not encoded
+      // not base64 — can not be a ciphertext produced by `encodeMessage`
       return null;
     }
 
