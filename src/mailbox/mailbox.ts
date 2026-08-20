@@ -94,9 +94,11 @@ export class Mailbox {
    * the status of the message.
    *
    * WARNING: a plaintext message (`encrypt = false`) has no confidentiality and no authenticity:
-   * on receipt it is indistinguishable from a message forged by the relay, and `download` will
-   * surface it as `ZaxMessageKind.unverified`. Only use plaintext for bootstrap flows where the
-   * recipient does not have the sender's key yet, and never trust its content
+   * on receipt it is indistinguishable from a message forged by the relay. `download` never
+   * returns it as an authenticated `message`: it is classified as `ZaxMessageKind.unverified` if
+   * the recipient already has the sender's key in their keyring, or as `ZaxMessageKind.plain` if
+   * they do not. Only use plaintext for bootstrap flows where the recipient does not have the
+   * sender's key yet, and never trust its content
    */
   async upload(url: string, guestKey: string, message: string, encrypt = true): Promise<Base64> {
     const relay = await this.prepareRelay(url);
