@@ -17,13 +17,14 @@ describe('Mailbox / Message authenticity', () => {
   let Mallory: Mailbox;
   let aliceHpk: string;
 
-  const rawMessage = (data: string, nonce: string): ZaxRawMessage => ({
+  const rawMessage = (data: string, nonce: string,
+    kind: ZaxMessageKind = ZaxMessageKind.message): ZaxRawMessage => ({
     data,
     time: Date.now(),
     from: aliceHpk,
     nonce,
-    kind: ZaxMessageKind.message
-  });
+    kind
+  } as ZaxRawMessage);
 
   beforeAll(async () => {
     NaCl.setDefaultInstance();
@@ -102,5 +103,65 @@ describe('Mailbox / Message authenticity', () => {
 
     expect(parsed.kind).toBe(ZaxMessageKind.unverified);
     expect(parsed.data).toBe(tampered);
+  });
+
+  // ---------- `file` messages and unknown kinds ----------
+
+  const metadata = { name: 'report.pdf', orig_size: 1024, md5: 'd41d8cd98f00b204e9800998ecf8427e' };
+
+  const fileEnvelope = (nonce: string, ctext: string): string =>
+    JSON.stringify({ nonce, ctext, uploadID: 'upload-1' });
+
+  it('classifies a genuine file message as an authenticated `file`', async () => {
+    const { nonce, ctext } = await Alice.encodeMessage('Bob', JSON.stringify(metadata));
+    const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
+    const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.file);
+    if (parsed.kind === ZaxMessageKind.file) {
+      expect(parsed.data).toEqual(metadata);
+      expect(parsed.uploadID).toBe('upload-1');
+    }
+  });
+
+  it('labels a file message with a garbage envelope as `unverified` instead of failing the batch', async () => {
+    // `JSON.parse` on the envelope throws, which would reject the whole `download`
+    const nonce = Utils.toBase64(await NaCl.getInstance().crypto_box_random_nonce());
+    const raw = rawMessage('not a JSON envelope', nonce, ZaxMessageKind.file);
+    const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+    expect(parsed.data).toBe('not a JSON envelope');
+  });
+
+  it('labels a file message encrypted with a wrong key as `unverified`', async () => {
+    const { nonce, ctext } = await Mallory.encodeMessage('Bob', JSON.stringify(metadata));
+    const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
+    const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+  });
+
+  it('labels an authenticated file message with malformed metadata as `unverified`', async () => {
+    // authentication passed, but the decrypted metadata is not valid JSON:
+    // a sender in the keyring must not be able to reject the whole batch either
+    const { nonce, ctext } = await Alice.encodeMessage('Bob', 'not JSON metadata');
+    const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
+    const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+  });
+
+  it('labels a message with an unknown `kind` as `unverified` instead of failing the batch', async () => {
+    // `kind` is supplied by the relay and may hold an arbitrary value at runtime
+    const { nonce, ctext } = await Alice.encodeMessage('Bob', 'hello Bob');
+    const raw = rawMessage(ctext, nonce, 'sticker' as ZaxMessageKind);
+    const parsed = await Bob['parseMessage'](raw);
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+    if (parsed.kind === ZaxMessageKind.unverified) {
+      expect(parsed.senderTag).toBe('Alice');
+      expect(parsed.data).toBe(ctext);
+    }
   });
 });

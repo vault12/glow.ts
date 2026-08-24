@@ -114,11 +114,12 @@ export class Mailbox {
    * Downloads all messages from a relay, decrypts them with a relay key,
    * and then parses each message to find out if it's an authenticated text message (`message`),
    * a file message (`file`), a message from a sender whose HPK is missing in the keyring
-   * (`plain`), or a text message claiming to be from a known sender whose payload failed
+   * (`plain`), or a message claiming to be from a known sender whose payload failed
    * authenticated decryption (`unverified`). Returns an array of mixed messages.
    *
-   * Note that only the text path is classified this way: a `file` message that fails to decode,
-   * or a message with an unknown `kind`, still throws and rejects the whole batch
+   * A single malformed message — text or file — never rejects the batch: it is returned
+   * as `unverified` alongside the messages that did parse. The same applies to a message
+   * with an unknown `kind`, which an untrusted relay may set to an arbitrary value
    */
   async download(url: string) {
     const relay = await this.prepareRelay(url);
@@ -127,18 +128,26 @@ export class Mailbox {
 
     const parsedMessages: ZaxParsedMessage[] = [];
     for (const message of messages) {
-      const senderTag = this.keyRing.getTagByHpk(message.from);
-      if (!senderTag) {
-        parsedMessages.push(await this.parsePlainMessage(message));
-      } else if (message.kind === 'message') {
-        parsedMessages.push(await this.parseTextMessage(message, senderTag));
-      } else if (message.kind === 'file') {
-        parsedMessages.push(await this.parseFileMessage(message, senderTag));
-      } else {
-        throw new Error('[Mailbox] download - Unknown message type');
-      }
+      parsedMessages.push(await this.parseMessage(message));
     }
     return parsedMessages;
+  }
+
+  /**
+   * Classifies a single raw relay message by sender and `kind`
+   */
+  private async parseMessage(message: ZaxRawMessage): Promise<ZaxParsedMessage> {
+    const senderTag = this.keyRing.getTagByHpk(message.from);
+    if (!senderTag) {
+      return await this.parsePlainMessage(message);
+    } else if (message.kind === 'message') {
+      return await this.parseTextMessage(message, senderTag);
+    } else if (message.kind === 'file') {
+      return await this.parseFileMessage(message, senderTag);
+    } else {
+      // `kind` comes from the relay and may hold anything at runtime
+      return this.markUnverified(message, senderTag);
+    }
   }
 
   /**
@@ -150,16 +159,37 @@ export class Mailbox {
   }
 
   /**
-   * Decrypts a message that represents uploaded file metadata
+   * Marks a raw Zax message claiming to be from a known sender as one that failed
+   * authentication, passing the relay-supplied payload through untouched
    */
-  private async parseFileMessage(message: ZaxRawMessage, senderTag: string) {
-    const { nonce, ctext, uploadID } = JSON.parse(message.data);
-    const rawData = await this.decodeMessage(senderTag, nonce, ctext);
-    if (rawData === null) {
-      throw new Error('[Mailbox] Failed to decode file message');
+  private markUnverified(message: ZaxRawMessage, senderTag: string): ZaxUnverifiedMessage {
+    return { data: message.data, time: message.time, senderTag, from: message.from,
+      nonce: message.nonce, kind: ZaxMessageKind.unverified };
+  }
+
+  /**
+   * Decrypts a message that represents uploaded file metadata. A payload that can not be
+   * authenticated (a garbage envelope, a forged ciphertext, or malformed metadata)
+   * is returned as `ZaxMessageKind.unverified` with the raw relay-supplied bytes.
+   *
+   * Unlike text messages, file metadata is always encrypted on upload (`startFileUpload`
+   * has no plaintext option), so an `unverified` file message always indicates forgery,
+   * tampering, or corruption — never a legitimate plaintext upload
+   */
+  private async parseFileMessage(message: ZaxRawMessage,
+    senderTag: string): Promise<ZaxFileMessage | ZaxUnverifiedMessage> {
+    try {
+      const { nonce, ctext, uploadID } = JSON.parse(message.data);
+      const rawData = await this.decodeMessage(senderTag, nonce, ctext);
+      if (rawData === null) {
+        return this.markUnverified(message, senderTag);
+      }
+      const data = JSON.parse(rawData) as FileUploadMetadata;
+      return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
+    } catch {
+      // the envelope or the authenticated metadata inside it is not valid JSON
+      return this.markUnverified(message, senderTag);
     }
-    const data = JSON.parse(rawData) as FileUploadMetadata;
-    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
   }
 
   /**
@@ -172,8 +202,7 @@ export class Mailbox {
     senderTag: string): Promise<ZaxTextMessage | ZaxUnverifiedMessage> {
     const data = await this.decodeMessage(senderTag, message.nonce, message.data);
     if (data === null) {
-      return ({ data: message.data, time: message.time, senderTag, from: message.from,
-        nonce: message.nonce, kind: ZaxMessageKind.unverified });
+      return this.markUnverified(message, senderTag);
     }
     return ({ data, time: message.time, senderTag, nonce: message.nonce, kind: ZaxMessageKind.message });
   }
