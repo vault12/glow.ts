@@ -75,6 +75,24 @@ describe('Mailbox / Message authenticity', () => {
     expect(parsed.senderTag).toBe('Alice');
   });
 
+  it('labels a message with a wrong-length nonce as `unverified` instead of failing the batch', async () => {
+    // `crypto_box_open` throws on a nonce that is not exactly `crypto_box_NONCEBYTES` long,
+    // which would reject the whole `download` and drop every other message in it
+    const { ctext } = await Alice.encodeMessage('Bob', 'hello Bob');
+    const shortNonce = Utils.toBase64(await NaCl.getInstance().random_bytes(8));
+    const parsed = await Bob['parseTextMessage'](rawMessage(ctext, shortNonce), 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+    expect(parsed.data).toBe(ctext);
+  });
+
+  it('labels a message with a non-base64 nonce as `unverified`', async () => {
+    const { ctext } = await Alice.encodeMessage('Bob', 'hello Bob');
+    const parsed = await Bob['parseTextMessage'](rawMessage(ctext, '!!! not base64 !!!'), 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+  });
+
   it('labels a tampered genuine ciphertext as `unverified`', async () => {
     const { nonce, ctext } = await Alice.encodeMessage('Bob', 'hello Bob');
     const corrupted = Utils.fromBase64(ctext);

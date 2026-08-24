@@ -114,8 +114,11 @@ export class Mailbox {
    * Downloads all messages from a relay, decrypts them with a relay key,
    * and then parses each message to find out if it's an authenticated text message (`message`),
    * a file message (`file`), a message from a sender whose HPK is missing in the keyring
-   * (`plain`), or a message claiming to be from a known sender whose payload failed
-   * authenticated decryption (`unverified`). Returns an array of mixed messages
+   * (`plain`), or a text message claiming to be from a known sender whose payload failed
+   * authenticated decryption (`unverified`). Returns an array of mixed messages.
+   *
+   * Note that only the text path is classified this way: a `file` message that fails to decode,
+   * or a message with an unknown `kind`, still throws and rejects the whole batch
    */
   async download(url: string) {
     const relay = await this.prepareRelay(url);
@@ -390,15 +393,22 @@ export class Mailbox {
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64) {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
+    let uint8ArrayNonce: Uint8Array;
     let uint8ArrayCtext: Uint8Array;
     try {
+      // both values come from the relay and may be arbitrary bytes
+      uint8ArrayNonce = Utils.fromBase64(nonce);
       uint8ArrayCtext = Utils.fromBase64(ctext);
     } catch {
-      // not base64 — can not be a ciphertext produced by `encodeMessage`
+      // not base64 — cannot be a nonce or ciphertext produced by `encodeMessage`
+      return null;
+    }
+    // `crypto_box_open` throws on a nonce of the wrong length, so reject it here instead
+    if (uint8ArrayNonce.length !== this.nacl.crypto_box_NONCEBYTES) {
       return null;
     }
 
-    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), uint8ArrayCtext,
+    return await EncryptionHelper.decodeMessage(uint8ArrayNonce, uint8ArrayCtext,
       Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
   }
 
