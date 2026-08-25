@@ -105,6 +105,19 @@ describe('Mailbox / Message authenticity', () => {
     expect(parsed.data).toBe(tampered);
   });
 
+  it('labels an authenticated payload of invalid UTF-8 as `unverified` instead of failing the batch', async () => {
+    // a raw `crypto_box` (bypassing encodeMessage's UTF-8 encoding) authenticates fine,
+    // but `decode_utf8` throws on the decrypted bytes — which would reject the whole `download`
+    const nacl = NaCl.getInstance();
+    const nonce = await nacl.crypto_box_random_nonce();
+    const ctext = await nacl.crypto_box(new Uint8Array([0xC3]), nonce,
+      Utils.fromBase64(Bob.keyRing.getPubCommKey()), Utils.fromBase64(Alice.keyRing.getPrivateCommKey()));
+    const parsed = await Bob['parseTextMessage'](
+      rawMessage(Utils.toBase64(ctext), Utils.toBase64(nonce)), 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+  });
+
   // ---------- `file` messages and unknown kinds ----------
 
   const metadata = { name: 'report.pdf', orig_size: 1024, md5: 'd41d8cd98f00b204e9800998ecf8427e' };
@@ -150,6 +163,25 @@ describe('Mailbox / Message authenticity', () => {
     const parsed = await Bob['parseFileMessage'](raw, 'Alice');
 
     expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+  });
+
+  it('labels a file message with a malformed envelope (no uploadID) as `unverified`', async () => {
+    const { nonce, ctext } = await Alice.encodeMessage('Bob', JSON.stringify(metadata));
+    const raw = rawMessage(JSON.stringify({ nonce, ctext }), nonce, ZaxMessageKind.file);
+    const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+    expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+  });
+
+  it('labels authenticated file metadata of the wrong JSON shape as `unverified`', async () => {
+    // JSON.parse accepts any JSON value; only an object with the mandatory fields is metadata
+    for (const payload of ['null', '42', '[]', '{}', '{"name":"a.txt"}']) {
+      const { nonce, ctext } = await Alice.encodeMessage('Bob', payload);
+      const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
+      const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+      expect(parsed.kind).toBe(ZaxMessageKind.unverified);
+    }
   });
 
   it('labels a message with an unknown `kind` as `unverified` instead of failing the batch', async () => {

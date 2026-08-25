@@ -117,9 +117,10 @@ export class Mailbox {
    * (`plain`), or a message claiming to be from a known sender whose payload failed
    * authenticated decryption (`unverified`). Returns an array of mixed messages.
    *
-   * A single malformed message — text or file — never rejects the batch: it is returned
-   * as `unverified` alongside the messages that did parse. The same applies to a message
-   * with an unknown `kind`, which an untrusted relay may set to an arbitrary value
+   * A single malformed message — text or file — never rejects the batch: when its sender
+   * is in the keyring it is returned as `unverified` alongside the messages that did parse
+   * (an unknown sender's payload is returned as `plain` in any case), and the same applies
+   * to a message with an unknown `kind`, which an untrusted relay may set to an arbitrary value
    */
   async download(url: string) {
     const relay = await this.prepareRelay(url);
@@ -140,14 +141,18 @@ export class Mailbox {
     const senderTag = this.keyRing.getTagByHpk(message.from);
     if (!senderTag) {
       return await this.parsePlainMessage(message);
-    } else if (message.kind === 'message') {
-      return await this.parseTextMessage(message, senderTag);
-    } else if (message.kind === 'file') {
-      return await this.parseFileMessage(message, senderTag);
-    } else {
-      // `kind` comes from the relay and may hold anything at runtime
-      return this.markUnverified(message, senderTag);
     }
+    try {
+      if (message.kind === 'message') {
+        return await this.parseTextMessage(message, senderTag);
+      } else if (message.kind === 'file') {
+        return await this.parseFileMessage(message, senderTag);
+      }
+    } catch {
+      // no single message may reject the whole batch, whatever a parser throws
+    }
+    // a parser failure above, or an unknown `kind` (the relay may put anything there)
+    return this.markUnverified(message, senderTag);
   }
 
   /**
@@ -180,16 +185,32 @@ export class Mailbox {
     senderTag: string): Promise<ZaxFileMessage | ZaxUnverifiedMessage> {
     try {
       const { nonce, ctext, uploadID } = JSON.parse(message.data);
+      if (typeof nonce !== 'string' || typeof ctext !== 'string' || typeof uploadID !== 'string') {
+        return this.markUnverified(message, senderTag);
+      }
       const rawData = await this.decodeMessage(senderTag, nonce, ctext);
       if (rawData === null) {
         return this.markUnverified(message, senderTag);
       }
-      const data = JSON.parse(rawData) as FileUploadMetadata;
-      return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
+      const data: unknown = JSON.parse(rawData);
+      if (!Mailbox.isFileMetadata(data)) {
+        return this.markUnverified(message, senderTag);
+      }
+      return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file };
     } catch {
       // the envelope or the authenticated metadata inside it is not valid JSON
       return this.markUnverified(message, senderTag);
     }
+  }
+
+  /**
+   * Runtime check of decrypted file metadata: `JSON.parse` alone accepts any JSON value
+   * (`null`, `42`, `[]`), so require an object carrying the mandatory fields
+   */
+  private static isFileMetadata(data: unknown): data is FileUploadMetadata {
+    return typeof data === 'object' && data !== null && !Array.isArray(data) &&
+      typeof (data as FileUploadMetadata).name === 'string' &&
+      typeof (data as FileUploadMetadata).orig_size === 'number';
   }
 
   /**
@@ -437,8 +458,13 @@ export class Mailbox {
       return null;
     }
 
-    return await EncryptionHelper.decodeMessage(uint8ArrayNonce, uint8ArrayCtext,
-      Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    try {
+      return await EncryptionHelper.decodeMessage(uint8ArrayNonce, uint8ArrayCtext,
+        Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    } catch {
+      // `decode_utf8` throws on an authenticated payload that is not valid UTF-8
+      return null;
+    }
   }
 
   /**
