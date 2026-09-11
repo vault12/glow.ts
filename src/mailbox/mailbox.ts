@@ -17,6 +17,7 @@ import {
   ZaxFileMessage,
   ZaxPlainMessage,
   ZaxTextMessage,
+  ZaxUnverifiedMessage,
   ZaxParsedMessage
 } from '../zax.interface';
 import { RelayFactory } from '../relay/relay-factory';
@@ -90,7 +91,14 @@ export class Mailbox {
   /**
    * Sends a free-form object to a guest we already have in our keyring. Set `encrypt` to `false` to
    * send a plaintext message. Returns a token that can be used with `messageStatus` command to check
-   * the status of the message
+   * the status of the message.
+   *
+   * WARNING: a plaintext message (`encrypt = false`) has no confidentiality and no authenticity:
+   * on receipt it is indistinguishable from a message forged by the relay. `download` never
+   * returns it as an authenticated `message`: it is classified as `ZaxMessageKind.unverified` if
+   * the recipient already has the sender's key in their keyring, or as `ZaxMessageKind.plain` if
+   * they do not. Only use plaintext for bootstrap flows where the recipient does not have the
+   * sender's key yet, and never trust its content
    */
   async upload(url: string, guestKey: string, message: string, encrypt = true): Promise<Base64> {
     const relay = await this.prepareRelay(url);
@@ -104,9 +112,15 @@ export class Mailbox {
 
   /**
    * Downloads all messages from a relay, decrypts them with a relay key,
-   * and then parses each message to find out if it's a text message, file message,
-   * or if it can't be decrypted because HPK is missing in the keyring.
-   * Returns an array of mixed messages
+   * and then parses each message to find out if it's an authenticated text message (`message`),
+   * a file message (`file`), a message from a sender whose HPK is missing in the keyring
+   * (`plain`), or a message claiming to be from a known sender whose payload failed
+   * authenticated decryption (`unverified`). Returns an array of mixed messages.
+   *
+   * A single malformed message — text or file — never rejects the batch: when its sender
+   * is in the keyring it is returned as `unverified` alongside the messages that did parse
+   * (an unknown sender's payload is returned as `plain` in any case), and the same applies
+   * to a message with an unknown `kind`, which an untrusted relay may set to an arbitrary value
    */
   async download(url: string) {
     const relay = await this.prepareRelay(url);
@@ -115,18 +129,30 @@ export class Mailbox {
 
     const parsedMessages: ZaxParsedMessage[] = [];
     for (const message of messages) {
-      const senderTag = this.keyRing.getTagByHpk(message.from);
-      if (!senderTag) {
-        parsedMessages.push(await this.parsePlainMessage(message));
-      } else if (message.kind === 'message') {
-        parsedMessages.push(await this.parseTextMessage(message, senderTag));
-      } else if (message.kind === 'file') {
-        parsedMessages.push(await this.parseFileMessage(message, senderTag));
-      } else {
-        throw new Error('[Mailbox] download - Unknown message type');
-      }
+      parsedMessages.push(await this.parseMessage(message));
     }
     return parsedMessages;
+  }
+
+  /**
+   * Classifies a single raw relay message by sender and `kind`
+   */
+  private async parseMessage(message: ZaxRawMessage): Promise<ZaxParsedMessage> {
+    const senderTag = this.keyRing.getTagByHpk(message.from);
+    if (!senderTag) {
+      return await this.parsePlainMessage(message);
+    }
+    try {
+      if (message.kind === 'message') {
+        return await this.parseTextMessage(message, senderTag);
+      } else if (message.kind === 'file') {
+        return await this.parseFileMessage(message, senderTag);
+      }
+    } catch {
+      // no single message may reject the whole batch, whatever a parser throws
+    }
+    // a parser failure above, or an unknown `kind` (the relay may put anything there)
+    return this.markUnverified(message, senderTag);
   }
 
   /**
@@ -138,26 +164,66 @@ export class Mailbox {
   }
 
   /**
-   * Decrypts a message that represents uploaded file metadata
+   * Marks a raw Zax message claiming to be from a known sender as one that failed
+   * authentication, passing the relay-supplied payload through untouched
    */
-  private async parseFileMessage(message: ZaxRawMessage, senderTag: string) {
-    const { nonce, ctext, uploadID } = JSON.parse(message.data);
-    const rawData = await this.decodeMessage(senderTag, nonce, ctext);
-    if (rawData === null) {
-      throw new Error('[Mailbox] Failed to decode file message');
-    }
-    const data = JSON.parse(rawData) as FileUploadMetadata;
-    return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file } as ZaxFileMessage;
+  private markUnverified(message: ZaxRawMessage, senderTag: string): ZaxUnverifiedMessage {
+    return { data: message.data, time: message.time, senderTag, from: message.from,
+      nonce: message.nonce, kind: ZaxMessageKind.unverified };
   }
 
   /**
-   * Attempts to decrypt a regular encrypted Zax message. Returns plain message if it was sent encrypted
+   * Decrypts a message that represents uploaded file metadata. A payload that can not be
+   * authenticated (a garbage envelope, a forged ciphertext, or malformed metadata)
+   * is returned as `ZaxMessageKind.unverified` with the raw relay-supplied bytes.
+   *
+   * Unlike text messages, file metadata is always encrypted on upload (`startFileUpload`
+   * has no plaintext option), so an `unverified` file message always indicates forgery,
+   * tampering, or corruption — never a legitimate plaintext upload
    */
-  private async parseTextMessage(message: ZaxRawMessage, senderTag: string): Promise<ZaxTextMessage> {
-    let data = await this.decodeMessage(senderTag, message.nonce, message.data);
-    // If the message was sent unencrypted, the line above will return `null`
-    if (!data) {
-      data = message.data;
+  private async parseFileMessage(message: ZaxRawMessage,
+    senderTag: string): Promise<ZaxFileMessage | ZaxUnverifiedMessage> {
+    try {
+      const { nonce, ctext, uploadID } = JSON.parse(message.data);
+      if (typeof nonce !== 'string' || typeof ctext !== 'string' || typeof uploadID !== 'string') {
+        return this.markUnverified(message, senderTag);
+      }
+      const rawData = await this.decodeMessage(senderTag, nonce, ctext);
+      if (rawData === null) {
+        return this.markUnverified(message, senderTag);
+      }
+      const data: unknown = JSON.parse(rawData);
+      if (!Mailbox.isFileMetadata(data)) {
+        return this.markUnverified(message, senderTag);
+      }
+      return { data, time: message.time, senderTag, uploadID, nonce, kind: ZaxMessageKind.file };
+    } catch {
+      // the envelope or the authenticated metadata inside it is not valid JSON
+      return this.markUnverified(message, senderTag);
+    }
+  }
+
+  /**
+   * Runtime check of decrypted file metadata: `JSON.parse` alone accepts any JSON value
+   * (`null`, `42`, `[]`), so require an object carrying the mandatory fields
+   */
+  private static isFileMetadata(data: unknown): data is FileUploadMetadata {
+    return typeof data === 'object' && data !== null && !Array.isArray(data) &&
+      typeof (data as FileUploadMetadata).name === 'string' &&
+      typeof (data as FileUploadMetadata).orig_size === 'number';
+  }
+
+  /**
+   * Attempts authenticated decryption of a regular Zax message. A payload that can not be
+   * authenticated with the sender's key (a plaintext upload, a forged message, or a tampered
+   * ciphertext — indistinguishable cases on receipt) is returned as `ZaxMessageKind.unverified`
+   * with the raw relay-supplied bytes, so that the application can decide whether to trust it
+   */
+  private async parseTextMessage(message: ZaxRawMessage,
+    senderTag: string): Promise<ZaxTextMessage | ZaxUnverifiedMessage> {
+    const data = await this.decodeMessage(senderTag, message.nonce, message.data);
+    if (data === null) {
+      return this.markUnverified(message, senderTag);
     }
     return ({ data, time: message.time, senderTag, nonce: message.nonce, kind: ZaxMessageKind.message });
   }
@@ -223,7 +289,8 @@ export class Mailbox {
   }
 
   /**
-   * Encrypts the file chunk symmetrically and transfers it to a relay
+   * Encrypts the file chunk symmetrically and transfers it to a relay.
+   * The chunk must not exceed `max_chunk_size` returned by `startFileUpload`.
    */
   async uploadFileChunk(url: string, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
@@ -370,21 +437,35 @@ export class Mailbox {
 
   /**
    * Decodes a ciphertext from a guest key already in our keyring with this nonce
-   * @returns null if failed to decode
+   * @returns null if the payload could not be authenticated and decrypted with this guest's key.
+   * A `null` carries no information about why: the payload may have been sent as plaintext,
+   * forged, or tampered with — these cases can not be told apart on the receiving side
    */
   async decodeMessage(guest: string, nonce: Base64, ctext: Base64) {
     const guestPk = this.getGuestKey(guest);
     const privateKey = this.keyRing.getPrivateCommKey();
+    let uint8ArrayNonce: Uint8Array;
     let uint8ArrayCtext: Uint8Array;
     try {
+      // both values come from the relay and may be arbitrary bytes
+      uint8ArrayNonce = Utils.fromBase64(nonce);
       uint8ArrayCtext = Utils.fromBase64(ctext);
     } catch {
-      // looks like ctext was not encoded
+      // not base64 — cannot be a nonce or ciphertext produced by `encodeMessage`
+      return null;
+    }
+    // `crypto_box_open` throws on a nonce of the wrong length, so reject it here instead
+    if (uint8ArrayNonce.length !== this.nacl.crypto_box_NONCEBYTES) {
       return null;
     }
 
-    return await EncryptionHelper.decodeMessage(Utils.fromBase64(nonce), uint8ArrayCtext,
-      Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    try {
+      return await EncryptionHelper.decodeMessage(uint8ArrayNonce, uint8ArrayCtext,
+        Utils.fromBase64(guestPk), Utils.fromBase64(privateKey));
+    } catch {
+      // `decode_utf8` throws on an authenticated payload that is not valid UTF-8
+      return null;
+    }
   }
 
   /**
