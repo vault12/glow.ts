@@ -289,7 +289,8 @@ export class Mailbox {
   }
 
   /**
-   * Encrypts the file chunk symmetrically and transfers it to a relay
+   * Encrypts the file chunk symmetrically and transfers it to a relay.
+   * The chunk must not exceed `max_chunk_size` returned by `startFileUpload`.
    */
   async uploadFileChunk(url: string, uploadID: string, chunk: Uint8Array,
     part: number, totalParts: number, skey: Uint8Array): Promise<UploadFileChunkResponse> {
