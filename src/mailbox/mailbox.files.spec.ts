@@ -29,12 +29,12 @@ describe('Mailbox / File transfer', () => {
     await Alice.keyRing.addGuest('Bob', bobKey);
     await Bob.keyRing.addGuest('Alice', aliceKey);
 
-    // Generate a random binary file
-    file = new Uint8Array(randomNumber(500, 1000)).map(() => randomNumber(0, 255));
+    // Chunk size within relay limits (see `max_chunk_size` of `startFileUpload` response)
+    chunkSize = randomNumber(1024, 2048);
 
-    // Arbitrary chunk size for testing purposes
-    // NOTE: for big files `max_chunk_size` value of `startFileUpload` response should be considered
-    chunkSize = randomNumber(50, 300);
+    // Generate a random binary file spanning several chunks
+    file = new Uint8Array(randomNumber(chunkSize * 2 + 1, chunkSize * 5)).map(() => randomNumber(0, 255));
+
     // Using Math.ceil here, because if file size is not evenly divisible
     // by `chunkSize`, then we have one more chunk
     numberOfChunks = Math.ceil(file.length / chunkSize);
