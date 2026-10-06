@@ -186,8 +186,8 @@ describe('Mailbox / Message authenticity', () => {
 
   it('classifies authenticated metadata without a `name` as a `file`: no field is mandatory', async () => {
     // a sender may include only what its recipient needs, e.g. `orig_size` plus the
-    // `skey` that `startFileUpload` adds — such a message is genuine
-    for (const sent of [{}, { name: 'a.txt' }, { orig_size: 2204, skey: 'c2tleQ==' }]) {
+    // `skey` that `startFileUpload` adds — such a message is genuine; extra fields pass through
+    for (const sent of [{}, { name: 'a.txt' }, { orig_size: 2204, skey: 'c2tleQ==' }, { orig_size: 1, extra: true }]) {
       const { nonce, ctext } = await Alice.encodeMessage('Bob', JSON.stringify(sent));
       const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
       const parsed = await Bob['parseFileMessage'](raw, 'Alice');
@@ -196,6 +196,17 @@ describe('Mailbox / Message authenticity', () => {
       if (parsed.kind === ZaxMessageKind.file) {
         expect(parsed.data).toEqual(sent);
       }
+    }
+  });
+
+  it('labels authenticated metadata whose present field has the wrong type as `unverified`', async () => {
+    // `ReceivedFileMetadata` promises the declared type for every field that is present
+    for (const sent of [{ name: 42 }, { orig_size: '2204' }, { skey: null }, { created: '2026' }]) {
+      const { nonce, ctext } = await Alice.encodeMessage('Bob', JSON.stringify(sent));
+      const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
+      const parsed = await Bob['parseFileMessage'](raw, 'Alice');
+
+      expect(parsed.kind).toBe(ZaxMessageKind.unverified);
     }
   });
 

@@ -12,6 +12,7 @@ import {
   DeleteFileResponse,
   MessageStatusResponse,
   FileUploadMetadata,
+  ReceivedFileMetadata,
   ZaxMessageKind,
   ZaxRawMessage,
   ZaxFileMessage,
@@ -204,15 +205,31 @@ export class Mailbox {
     }
   }
 
+  private static readonly fileMetadataFieldTypes: Record<keyof FileUploadMetadata, 'string' | 'number'> = {
+    name: 'string',
+    orig_size: 'number',
+    md5: 'string',
+    created: 'number',
+    modified: 'number',
+    attrs: 'string',
+    skey: 'string'
+  };
+
   /**
    * Runtime check of decrypted file metadata: `JSON.parse` alone accepts any JSON value
    * (`null`, `42`, `[]`), so require a JSON object. No field is mandatory: which ones a sender
    * includes is its own contract with the recipient (a client may send nothing but `orig_size`
    * and the `skey` added by `startFileUpload`), and a missing field says nothing about
-   * authenticity — the payload already passed authenticated decryption
+   * authenticity — the payload already passed authenticated decryption. A field that is present
+   * must have its declared type, so that `ReceivedFileMetadata` holds for every `file` message
    */
-  private static isFileMetadata(data: unknown): data is FileUploadMetadata {
-    return typeof data === 'object' && data !== null && !Array.isArray(data);
+  private static isFileMetadata(data: unknown): data is ReceivedFileMetadata {
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      return false;
+    }
+    const fields = data as Record<string, unknown>;
+    return Object.entries(Mailbox.fileMetadataFieldTypes)
+      .every(([field, type]) => fields[field] === undefined || typeof fields[field] === type);
   }
 
   /**
@@ -319,15 +336,16 @@ export class Mailbox {
   }
 
   /**
-   * Fetches the file metadata by uploadID, which was declared by the uploader
+   * Fetches the file metadata by uploadID, which was declared by the uploader,
+   * or `undefined` when the mailbox holds no `file` message with that uploadID
    */
-  async getFileMetadata(url: string, uploadID: string): Promise<FileUploadMetadata> {
+  async getFileMetadata(url: string, uploadID: string): Promise<ReceivedFileMetadata | undefined> {
     const messages = await this.download(url);
 
     const fileMessage = messages
-      .filter(message => message.kind === 'file')
-      .find(message => (message as ZaxFileMessage).uploadID === uploadID);
-    return fileMessage?.data as FileUploadMetadata;
+      .filter((message): message is ZaxFileMessage => message.kind === ZaxMessageKind.file)
+      .find(message => message.uploadID === uploadID);
+    return fileMessage?.data;
   }
 
   /**
