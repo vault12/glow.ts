@@ -179,7 +179,8 @@ export class Mailbox {
    *
    * Unlike text messages, file metadata is always encrypted on upload (`startFileUpload`
    * has no plaintext option), so an `unverified` file message always indicates forgery,
-   * tampering, or corruption — never a legitimate plaintext upload
+   * tampering, or corruption — never a legitimate plaintext upload. Authenticated metadata
+   * is returned as a `file` whatever fields it carries, see `isFileMetadata`
    */
   private async parseFileMessage(message: ZaxRawMessage,
     senderTag: string): Promise<ZaxFileMessage | ZaxUnverifiedMessage> {
@@ -205,12 +206,13 @@ export class Mailbox {
 
   /**
    * Runtime check of decrypted file metadata: `JSON.parse` alone accepts any JSON value
-   * (`null`, `42`, `[]`), so require an object carrying the mandatory fields
+   * (`null`, `42`, `[]`), so require a JSON object. No field is mandatory: which ones a sender
+   * includes is its own contract with the recipient (a client may send nothing but `orig_size`
+   * and the `skey` added by `startFileUpload`), and a missing field says nothing about
+   * authenticity — the payload already passed authenticated decryption
    */
   private static isFileMetadata(data: unknown): data is FileUploadMetadata {
-    return typeof data === 'object' && data !== null && !Array.isArray(data) &&
-      typeof (data as FileUploadMetadata).name === 'string' &&
-      typeof (data as FileUploadMetadata).orig_size === 'number';
+    return typeof data === 'object' && data !== null && !Array.isArray(data);
   }
 
   /**
