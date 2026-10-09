@@ -9,7 +9,7 @@ import { Mailbox } from './mailbox/mailbox';
 import { Relay } from './relay/relay';
 import {
   ZaxMessageKind, ZaxTextMessage, ZaxFileMessage, ZaxPlainMessage, ZaxUnverifiedMessage, ZaxParsedMessage,
-  FileStatusResponse, ReceivedFileMetadata
+  FileStatusResponse
 } from './zax.interface';
 import { JsNaClDriver } from './nacl/js-nacl-driver';
 import { Utils } from './utils/utils';
@@ -34,7 +34,6 @@ export {
   type ZaxUnverifiedMessage,
   type ZaxParsedMessage,
   type FileStatusResponse,
-  type ReceivedFileMetadata,
   type NaClDriver,
   JsNaClDriver,
   Utils,
