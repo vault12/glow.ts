@@ -68,7 +68,7 @@ export interface ZaxTextMessage {
 }
 
 export interface ZaxFileMessage {
-  data: FileUploadMetadata;
+  data: ReceivedFileMetadata;
   time: number;
   senderTag: string;
   uploadID: string;
@@ -153,3 +153,9 @@ export interface FileUploadMetadata {
 
   [field: string]: unknown;
 }
+
+/**
+ * File metadata as it arrives in a `file` message: any JSON object that passed authenticated
+ * decryption. Nothing is guaranteed about its fields, so narrow them before use
+ */
+export type ReceivedFileMetadata = Record<string, unknown>;

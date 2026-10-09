@@ -12,6 +12,7 @@ import {
   DeleteFileResponse,
   MessageStatusResponse,
   FileUploadMetadata,
+  ReceivedFileMetadata,
   ZaxMessageKind,
   ZaxRawMessage,
   ZaxFileMessage,
@@ -209,7 +210,7 @@ export class Mailbox {
    * Its fields are not checked: the payload already passed authenticated decryption, and Zax
    * never sees the metadata, so its shape is the sender's contract with the recipient
    */
-  private static isFileMetadata(data: unknown): data is FileUploadMetadata {
+  private static isFileMetadata(data: unknown): data is ReceivedFileMetadata {
     return typeof data === 'object' && data !== null && !Array.isArray(data);
   }
 
@@ -320,7 +321,7 @@ export class Mailbox {
    * Fetches the file metadata by uploadID, which was declared by the uploader,
    * or `undefined` when the mailbox holds no `file` message with that uploadID
    */
-  async getFileMetadata(url: string, uploadID: string): Promise<FileUploadMetadata | undefined> {
+  async getFileMetadata(url: string, uploadID: string): Promise<ReceivedFileMetadata | undefined> {
     const messages = await this.download(url);
 
     const fileMessage = messages
