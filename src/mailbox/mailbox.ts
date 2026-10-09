@@ -181,7 +181,7 @@ export class Mailbox {
    * Unlike text messages, file metadata is always encrypted on upload (`startFileUpload`
    * has no plaintext option), so an `unverified` file message always indicates forgery,
    * tampering, or corruption — never a legitimate plaintext upload. Authenticated metadata
-   * is returned as a `file` whatever fields it carries, see `isFileMetadata`
+   * is returned as a `file` as long as it is a JSON object, see `isFileMetadata`
    */
   private async parseFileMessage(message: ZaxRawMessage,
     senderTag: string): Promise<ZaxFileMessage | ZaxUnverifiedMessage> {
@@ -205,31 +205,13 @@ export class Mailbox {
     }
   }
 
-  private static readonly fileMetadataFieldTypes: Record<keyof FileUploadMetadata, 'string' | 'number'> = {
-    name: 'string',
-    orig_size: 'number',
-    md5: 'string',
-    created: 'number',
-    modified: 'number',
-    attrs: 'string',
-    skey: 'string'
-  };
-
   /**
-   * Runtime check of decrypted file metadata: `JSON.parse` alone accepts any JSON value
-   * (`null`, `42`, `[]`), so require a JSON object. No field is mandatory: which ones a sender
-   * includes is its own contract with the recipient (a client may send nothing but `orig_size`
-   * and the `skey` added by `startFileUpload`), and a missing field says nothing about
-   * authenticity — the payload already passed authenticated decryption. A field that is present
-   * must have its declared type, so that `ReceivedFileMetadata` holds for every `file` message
+   * `JSON.parse` alone accepts any JSON value (`null`, `42`, `[]`), so require a JSON object.
+   * Its fields are not checked: the payload already passed authenticated decryption, and Zax
+   * never sees the metadata, so its shape is the sender's contract with the recipient
    */
   private static isFileMetadata(data: unknown): data is ReceivedFileMetadata {
-    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-      return false;
-    }
-    const fields = data as Record<string, unknown>;
-    return Object.entries(Mailbox.fileMetadataFieldTypes)
-      .every(([field, type]) => fields[field] === undefined || typeof fields[field] === type);
+    return typeof data === 'object' && data !== null && !Array.isArray(data);
   }
 
   /**

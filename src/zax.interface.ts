@@ -137,20 +137,25 @@ export interface DeleteFileResponse {
   status: 'OK' | 'NOT_FOUND';
 }
 
+/**
+ * File metadata is opaque to Zax, so its content is up to the sender and the recipient.
+ * Only `orig_size` is required, because `startFileUpload` declares it to the relay as `file_size`.
+ * The other fields are just examples of what a client may send
+ */
 export interface FileUploadMetadata {
-  name: string;
   orig_size: number;
+  name?: string;
   md5?: string;
   created?: number;
   modified?: number;
   attrs?: string;
   skey?: Base64;
+
+  [field: string]: unknown;
 }
 
 /**
- * File metadata as it arrives in a `file` message. A sender may include only the fields its
- * recipient needs, so none of them is guaranteed, but a field that is present has the type
- * declared in `FileUploadMetadata`: `Mailbox.download` returns metadata that breaks this as
- * `unverified` instead of a `file`. Fields outside `FileUploadMetadata` pass through untyped
+ * File metadata as it arrives in a `file` message: any JSON object that passed authenticated
+ * decryption. Nothing is guaranteed about its fields, so narrow them before use
  */
-export type ReceivedFileMetadata = Partial<FileUploadMetadata>;
+export type ReceivedFileMetadata = Record<string, unknown>;

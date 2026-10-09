@@ -199,17 +199,6 @@ describe('Mailbox / Message authenticity', () => {
     }
   });
 
-  it('labels authenticated metadata whose present field has the wrong type as `unverified`', async () => {
-    // `ReceivedFileMetadata` promises the declared type for every field that is present
-    for (const sent of [{ name: 42 }, { orig_size: '2204' }, { skey: null }, { created: '2026' }]) {
-      const { nonce, ctext } = await Alice.encodeMessage('Bob', JSON.stringify(sent));
-      const raw = rawMessage(fileEnvelope(nonce, ctext), nonce, ZaxMessageKind.file);
-      const parsed = await Bob['parseFileMessage'](raw, 'Alice');
-
-      expect(parsed.kind).toBe(ZaxMessageKind.unverified);
-    }
-  });
-
   it('labels a message with an unknown `kind` as `unverified` instead of failing the batch', async () => {
     // `kind` is supplied by the relay and may hold an arbitrary value at runtime
     const { nonce, ctext } = await Alice.encodeMessage('Bob', 'hello Bob');
